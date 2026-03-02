@@ -18,6 +18,7 @@ export function getCorsHeaders(req, methods = 'GET, OPTIONS') {
   const origin = req.headers.get('origin') || '';
   const allowOrigin = isAllowedOrigin(origin) ? origin : 'https://world-viewer-seven.vercel.app';
   return {
+    
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': methods,
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-WorldMonitor-Key',
