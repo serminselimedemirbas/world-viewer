@@ -8,6 +8,7 @@ const ALLOWED_ORIGIN_PATTERNS = [
   /^https?:\/\/[a-z0-9-]+\.tauri\.localhost(:\d+)?$/i,
   /^tauri:\/\/localhost$/,
   /^asset:\/\/localhost$/,
+  https://world-viewer-*.vercel.app
 ];
 
 function isAllowedOrigin(origin) {
@@ -18,7 +19,7 @@ export function getCorsHeaders(req, methods = 'GET, OPTIONS') {
   const origin = req.headers.get('origin') || '';
   const allowOrigin = isAllowedOrigin(origin) ? origin : 'https://world-viewer-seven.vercel.app';
   return {
-    
+
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': methods,
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-WorldMonitor-Key',
