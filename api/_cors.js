@@ -8,8 +8,7 @@ const ALLOWED_ORIGIN_PATTERNS = [
   /^https?:\/\/tauri\.localhost(:\d+)?$/,
   /^https?:\/\/[a-z0-9-]+\.tauri\.localhost(:\d+)?$/i,
   /^tauri:\/\/localhost$/,
-  /^asset:\/\/localhost$/,
-  https://world-viewer-*.vercel.app
+  /^asset:\/\/localhost$/
 ];
 
 function isAllowedOrigin(origin) {
