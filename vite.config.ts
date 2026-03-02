@@ -382,6 +382,18 @@ function sebufApiPlugin(): Plugin {
         }
       });
 
+      // Block home page — this deployment serves API only
+      server.middlewares.use((req, res, next) => {
+        const pathname = req.url?.split('?')[0];
+        if (pathname === '/' || pathname === '/index.html') {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Not Found', message: 'This server serves API only.' }));
+          return;
+        }
+        next();
+      });
+
       server.middlewares.use(async (req, res, next) => {
         // Only intercept sebuf routes: /api/{domain}/v1/* (domain may contain hyphens)
         if (!req.url || !/^\/api\/[a-z-]+\/v1\//.test(req.url)) {

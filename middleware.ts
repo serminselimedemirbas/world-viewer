@@ -1,7 +1,8 @@
 /**
  * Vercel Edge Middleware — blocks bot/crawler traffic from API routes.
- * Runs on /api/* paths only (configured via matcher below).
+ * Runs on /api/* and / paths (configured via matcher below).
  * Social preview bots are allowed on /api/story and /api/og-story.
+ * The home page (/) is disabled — this deployment serves API only.
  */
 
 const BOT_UA =
@@ -24,6 +25,14 @@ export default function middleware(request: Request) {
 
   const ua = request.headers.get('user-agent') ?? '';
   const path = url.pathname;
+
+  // Block home page — this deployment is API only
+  if (path === '/' || path === '/index.html') {
+    return new Response('{"error":"Not Found","message":"This deployment serves API only."}', {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   // Allow social preview/image bots on OG image assets (bypasses Vercel Attack Challenge)
   if (path.startsWith('/favico/') || path.endsWith('.png')) {
@@ -60,5 +69,5 @@ export default function middleware(request: Request) {
 }
 
 export const config = {
-  matcher: ['/api/:path*', '/favico/:path*'],
+  matcher: ['/', '/index.html', '/api/:path*', '/favico/:path*'],
 };
