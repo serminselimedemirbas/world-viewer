@@ -10,6 +10,7 @@ const BROWSER_ORIGIN_PATTERNS = [
   /^https:\/\/worldmonitor-[a-z0-9-]+\.vercel\.app$/,
     /^https:\/\/world-viewer-[a-z0-9-]+\.vercel\.app$/,
   /^https:\/\/(.*\.)?world-viewer-seven.vercel\.app$/,
+  /^https:\/\/(.*\.)?real-time-intel-monitorly\.app$/,
   ...(process.env.NODE_ENV === 'production' ? [] : [
     /^https?:\/\/localhost(:\d+)?$/,
     /^https?:\/\/127\.0\.0\.1(:\d+)?$/,

@@ -12,6 +12,7 @@ const PRODUCTION_PATTERNS: RegExp[] = [
   /^https:\/\/worldmonitor-[a-z0-9-]+-elie-[a-z0-9]+\.vercel\.app$/,
   /^https:\/\/world-viewer-[a-z0-9-]+\.vercel\.app$/,
   /^https:\/\/(.*\.)?world-viewer-seven.vercel\.app$/,
+  /^https:\/\/(.*\.)?real-time-intel-monitorly\.app$/,
   /^https?:\/\/localhost(:\d+)?$/,
   /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
   /^https?:\/\/tauri\.localhost(:\d+)?$/,
