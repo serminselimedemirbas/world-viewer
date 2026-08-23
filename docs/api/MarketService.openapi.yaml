@@ -2,11 +2,6 @@ openapi: 3.1.0
 info:
     title: MarketService API
     version: 1.0.0
-security:
-    - WorldMonitorKey: []
-    - ApiKeyHeader: []
-servers:
-    - url: https://api.worldmonitor.app
 paths:
     /api/market/v1/list-market-quotes:
         get:
@@ -22,40 +17,15 @@ paths:
                   required: false
                   style: form
                   explode: true
-                  example:
-                      - "AAPL"
                   schema:
                     type: array
                     items:
                         type: string
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "finnhubSkipped": true
-                                "quotes":
-                                    - "change": 1.5
-                                      "display": "example"
-                                      "name": "WorldMonitor Analyst"
-                                      "price": 75.25
-                                      "sparkline":
-                                          - 1.5
-                                      "symbol": "AAPL"
-                                "rateLimited": true
-                                "skipReason": "example"
-                                "unavailableSymbols":
-                                    - "reason": "MARKET_QUOTE_UNAVAILABLE_REASON_NOT_FOUND"
-                                      "symbol": "AAPL"
                             schema:
                                 $ref: '#/components/schemas/ListMarketQuotesResponse'
                 "400":
@@ -63,84 +33,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/list-crypto-quotes:
         get:
             tags:
@@ -158,37 +57,15 @@ paths:
                   required: false
                   style: form
                   explode: true
-                  example:
-                      - "example"
                   schema:
                     type: array
                     items:
                         type: string
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "provider": "worldmonitor"
-                                "quotes":
-                                    - "change": 1.5
-                                      "change7d": 1.5
-                                      "name": "WorldMonitor Analyst"
-                                      "price": 75.25
-                                      "sparkline":
-                                          - 1.5
-                                      "symbol": "AAPL"
-                                "unresolvedIds":
-                                    - "example"
                             schema:
                                 $ref: '#/components/schemas/ListCryptoQuotesResponse'
                 "400":
@@ -196,84 +73,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/list-commodity-quotes:
         get:
             tags:
@@ -295,34 +101,15 @@ paths:
                   required: false
                   style: form
                   explode: true
-                  example:
-                      - "GC=F"
                   schema:
                     type: array
                     items:
                         type: string
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "quotes":
-                                    - "change": 1.5
-                                      "display": "example"
-                                      "name": "WorldMonitor Analyst"
-                                      "price": 75.25
-                                      "sparkline":
-                                          - 1.5
-                                      "symbol": "GC=F"
                             schema:
                                 $ref: '#/components/schemas/ListCommodityQuotesResponse'
                 "400":
@@ -330,84 +117,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/get-physical-premiums:
         get:
             tags:
@@ -424,47 +140,15 @@ paths:
                   required: false
                   style: form
                   explode: true
-                  example:
-                      - "gold"
                   schema:
                     type: array
                     items:
                         type: string
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "fx":
-                                    "asOf": "example"
-                                    "pair": "example"
-                                    "rate": 75.25
-                                    "source": "example"
-                                "premiums":
-                                    - "computedAt": "2026-01-15T12:00:00Z"
-                                      "metal": "example"
-                                      "paper":
-                                          "asOf": "example"
-                                          "currency": "USD"
-                                          "price": 75.25
-                                          "source": "example"
-                                          "unit": "example"
-                                      "physical":
-                                          "asOf": "example"
-                                          "currency": "USD"
-                                          "price": 75.25
-                                          "source": "example"
-                                          "unit": "example"
-                                      "premiumPct": 1.5
                             schema:
                                 $ref: '#/components/schemas/GetPhysicalPremiumsResponse'
                 "400":
@@ -472,84 +156,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/get-sector-summary:
         get:
             tags:
@@ -564,15 +177,6 @@ paths:
                     Time period for performance calculation (e.g., "1d", "1w", "1m"). Defaults to "1d".
                      Accepted but currently ignored; no-op until this handler supports the parameter.
                   required: false
-                  example: "1d"
-                  schema:
-                    type: string
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
                   schema:
                     type: string
             responses:
@@ -580,11 +184,6 @@ paths:
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "sectors":
-                                    - "change": 1.5
-                                      "name": "WorldMonitor Analyst"
-                                      "symbol": "AAPL"
                             schema:
                                 $ref: '#/components/schemas/GetSectorSummaryResponse'
                 "400":
@@ -592,84 +191,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/list-stablecoin-markets:
         get:
             tags:
@@ -695,45 +223,15 @@ paths:
                   required: false
                   style: form
                   explode: true
-                  example:
-                      - "example"
                   schema:
                     type: array
                     items:
                         type: string
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "dataStatus": "example"
-                                "stablecoins":
-                                    - "change24h": 1.5
-                                      "change7d": 1.5
-                                      "deviation": 1.5
-                                      "id": "example-id"
-                                      "image": "example"
-                                      "marketCap": 1.5
-                                      "symbol": "AAPL"
-                                "summary":
-                                    "coinCount": 1
-                                    "depeggedCount": 1
-                                    "healthStatus": "example"
-                                    "totalMarketCap": 1
-                                    "totalVolume24h": 1
-                                "timestamp": "2026-01-15T12:00:00Z"
-                                "unresolved":
-                                    - "id": "example-id"
-                                      "reason": "example"
                             schema:
                                 $ref: '#/components/schemas/ListStablecoinMarketsResponse'
                 "400":
@@ -741,84 +239,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/list-etf-flows:
         get:
             tags:
@@ -826,36 +253,11 @@ paths:
             summary: ListEtfFlows
             description: ListEtfFlows retrieves BTC spot ETF flow estimates from Yahoo Finance.
             operationId: ListEtfFlows
-            parameters:
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "etfs":
-                                    - "avgVolume": 1
-                                      "direction": "example"
-                                      "estFlow": 1
-                                      "issuer": "example"
-                                      "price": 75.25
-                                      "ticker": "AAPL"
-                                "rateLimited": true
-                                "summary":
-                                    "etfCount": 1
-                                    "inflowCount": 1
-                                    "netDirection": "example"
-                                    "outflowCount": 1
-                                    "totalEstFlow": 1
-                                "timestamp": "2026-01-15T12:00:00Z"
                             schema:
                                 $ref: '#/components/schemas/ListEtfFlowsResponse'
                 "400":
@@ -863,84 +265,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/get-country-stock-index:
         get:
             tags:
@@ -952,62 +283,7 @@ paths:
                 - name: country_code
                   in: query
                   description: ISO 3166-1 alpha-2 country code (e.g., "US", "GB", "JP").
-                  required: true
-                  example: "US"
-                  schema:
-                    type: string
-                    enum:
-                        - 'US'
-                        - 'GB'
-                        - 'DE'
-                        - 'FR'
-                        - 'JP'
-                        - 'CN'
-                        - 'HK'
-                        - 'IN'
-                        - 'KR'
-                        - 'TW'
-                        - 'AU'
-                        - 'BR'
-                        - 'CA'
-                        - 'MX'
-                        - 'AR'
-                        - 'RU'
-                        - 'ZA'
-                        - 'SA'
-                        - 'AE'
-                        - 'IL'
-                        - 'TR'
-                        - 'PL'
-                        - 'NL'
-                        - 'CH'
-                        - 'ES'
-                        - 'IT'
-                        - 'SE'
-                        - 'NO'
-                        - 'SG'
-                        - 'TH'
-                        - 'MY'
-                        - 'ID'
-                        - 'PH'
-                        - 'NZ'
-                        - 'EG'
-                        - 'CL'
-                        - 'PE'
-                        - 'AT'
-                        - 'BE'
-                        - 'FI'
-                        - 'DK'
-                        - 'IE'
-                        - 'PT'
-                        - 'CZ'
-                        - 'HU'
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
                   required: false
-                  example: "keys(@)"
                   schema:
                     type: string
             responses:
@@ -1015,12 +291,6 @@ paths:
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "available": true
-                                "code": "US"
-                                "currency": "USD"
-                                "fetchedAt": "2026-01-15T12:00:00Z"
-                                "indexName": "WorldMonitor Analyst"
                             schema:
                                 $ref: '#/components/schemas/GetCountryStockIndexResponse'
                 "400":
@@ -1028,84 +298,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/list-gulf-quotes:
         get:
             tags:
@@ -1113,28 +312,11 @@ paths:
             summary: ListGulfQuotes
             description: ListGulfQuotes retrieves Gulf region market quotes (indices, currencies, oil).
             operationId: ListGulfQuotes
-            parameters:
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "quotes":
-                                    - "change": 1.5
-                                      "country": "US"
-                                      "flag": "example"
-                                      "name": "WorldMonitor Analyst"
-                                      "price": 75.25
-                                "rateLimited": true
                             schema:
                                 $ref: '#/components/schemas/ListGulfQuotesResponse'
                 "400":
@@ -1142,141 +324,44 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/analyze-stock:
         get:
             tags:
                 - MarketService
             summary: AnalyzeStock
-            description: AnalyzeStock retrieves a premium stock analysis report with technicals, news, and AI synthesis. PRO-gated. Requires entitlement tier >= 1.
+            description: AnalyzeStock retrieves a premium stock analysis report with technicals, news, and AI synthesis.
             operationId: AnalyzeStock
-            security:
-                - WorldMonitorKey: []
-                - ApiKeyHeader: []
-                - BearerAuth: []
             parameters:
                 - name: symbol
                   in: query
                   description: Stock ticker symbol to analyze.
-                  required: true
-                  example: "AAPL"
+                  required: false
                   schema:
                     type: string
                 - name: name
                   in: query
                   description: Optional company display name used to disambiguate the symbol.
                   required: false
-                  example: "WorldMonitor Analyst"
                   schema:
                     type: string
                 - name: include_news
                   in: query
                   description: Whether to include recent news in the stock analysis.
                   required: false
-                  example: true
                   schema:
                     type: boolean
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "action": "example"
-                                "analysisAt": 1717200000000
-                                "analysisId": "example-id"
-                                "analystConsensus":
-                                    "buy": 1
-                                    "hold": 1
-                                    "period": "daily"
-                                    "sell": 1
-                                    "strongBuy": 1
-                                "atr": 1.5
                             schema:
                                 $ref: '#/components/schemas/AnalyzeStockResponse'
                 "400":
@@ -1284,95 +369,20 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: PRO entitlement access denied.
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/get-stock-analysis-history:
         get:
             tags:
                 - MarketService
             summary: GetStockAnalysisHistory
-            description: GetStockAnalysisHistory retrieves shared premium stock analysis history from the backend store. PRO-gated. Requires entitlement tier >= 1.
+            description: GetStockAnalysisHistory retrieves shared premium stock analysis history from the backend store.
             operationId: GetStockAnalysisHistory
-            security:
-                - WorldMonitorKey: []
-                - ApiKeyHeader: []
-                - BearerAuth: []
             parameters:
                 - name: symbols
                   in: query
@@ -1380,8 +390,6 @@ paths:
                   required: false
                   style: form
                   explode: true
-                  example:
-                      - "AAPL"
                   schema:
                     type: array
                     items:
@@ -1390,7 +398,6 @@ paths:
                   in: query
                   description: Maximum number of history snapshots to return per symbol.
                   required: false
-                  example: 25
                   schema:
                     type: integer
                     format: int32
@@ -1398,36 +405,13 @@ paths:
                   in: query
                   description: Whether history snapshots should include stored news summaries.
                   required: false
-                  example: true
                   schema:
                     type: boolean
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "items":
-                                    - "snapshots":
-                                        - "action": "example"
-                                          "analysisAt": 1717200000000
-                                          "analysisId": "example-id"
-                                          "analystConsensus":
-                                              "buy": 1
-                                              "hold": 1
-                                              "period": "daily"
-                                              "sell": 1
-                                              "strongBuy": 1
-                                          "atr": 1.5
-                                      "symbol": "AAPL"
                             schema:
                                 $ref: '#/components/schemas/GetStockAnalysisHistoryResponse'
                 "400":
@@ -1435,137 +419,45 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: PRO entitlement access denied.
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/backtest-stock:
         get:
             tags:
                 - MarketService
             summary: BacktestStock
-            description: BacktestStock replays the technical-only stock signal over recent price history. PRO-gated. Requires entitlement tier >= 1.
+            description: BacktestStock replays the technical-only stock signal over recent price history.
             operationId: BacktestStock
-            security:
-                - WorldMonitorKey: []
-                - ApiKeyHeader: []
-                - BearerAuth: []
             parameters:
                 - name: symbol
                   in: query
                   description: Stock ticker symbol to backtest.
-                  required: true
-                  example: "AAPL"
+                  required: false
                   schema:
                     type: string
                 - name: name
                   in: query
                   description: Optional company display name used to disambiguate the symbol.
                   required: false
-                  example: "WorldMonitor Analyst"
                   schema:
                     type: string
                 - name: eval_window_days
                   in: query
                   description: Evaluation window in days for simulated backtest outcomes.
                   required: false
-                  example: 7
                   schema:
                     type: integer
                     format: int32
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "actionableEvaluations": 1
-                                "available": true
-                                "avgSimulatedReturnPct": 1.5
-                                "cumulativeSimulatedReturnPct": 1.5
-                                "currency": "USD"
                             schema:
                                 $ref: '#/components/schemas/BacktestStockResponse'
                 "400":
@@ -1573,95 +465,20 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: PRO entitlement access denied.
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/list-stored-stock-backtests:
         get:
             tags:
                 - MarketService
             summary: ListStoredStockBacktests
-            description: ListStoredStockBacktests retrieves stored premium backtest snapshots from the backend store. PRO-gated. Requires entitlement tier >= 1.
+            description: ListStoredStockBacktests retrieves stored premium backtest snapshots from the backend store.
             operationId: ListStoredStockBacktests
-            security:
-                - WorldMonitorKey: []
-                - ApiKeyHeader: []
-                - BearerAuth: []
             parameters:
                 - name: symbols
                   in: query
@@ -1669,8 +486,6 @@ paths:
                   required: false
                   style: form
                   explode: true
-                  example:
-                      - "AAPL"
                   schema:
                     type: array
                     items:
@@ -1679,30 +494,14 @@ paths:
                   in: query
                   description: Evaluation window in days used by stored backtests.
                   required: false
-                  example: 7
                   schema:
                     type: integer
                     format: int32
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "items":
-                                    - "actionableEvaluations": 1
-                                      "available": true
-                                      "avgSimulatedReturnPct": 1.5
-                                      "cumulativeSimulatedReturnPct": 1.5
-                                      "currency": "USD"
                             schema:
                                 $ref: '#/components/schemas/ListStoredStockBacktestsResponse'
                 "400":
@@ -1710,84 +509,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: PRO entitlement access denied.
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/list-crypto-sectors:
         get:
             tags:
@@ -1795,25 +523,11 @@ paths:
             summary: ListCryptoSectors
             description: ListCryptoSectors retrieves crypto sector performance averages.
             operationId: ListCryptoSectors
-            parameters:
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "sectors":
-                                    - "change": 1.5
-                                      "id": "example-id"
-                                      "name": "WorldMonitor Analyst"
                             schema:
                                 $ref: '#/components/schemas/ListCryptoSectorsResponse'
                 "400":
@@ -1821,84 +535,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/list-defi-tokens:
         get:
             tags:
@@ -1906,29 +549,11 @@ paths:
             summary: ListDefiTokens
             description: ListDefiTokens retrieves DeFi token prices and changes.
             operationId: ListDefiTokens
-            parameters:
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "tokens":
-                                    - "change": 1.5
-                                      "change7d": 1.5
-                                      "name": "WorldMonitor Analyst"
-                                      "price": 75.25
-                                      "sparkline":
-                                          - 1.5
-                                      "symbol": "AAPL"
                             schema:
                                 $ref: '#/components/schemas/ListDefiTokensResponse'
                 "400":
@@ -1936,84 +561,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/list-ai-tokens:
         get:
             tags:
@@ -2021,29 +575,11 @@ paths:
             summary: ListAiTokens
             description: ListAiTokens retrieves AI-focused crypto token prices and changes.
             operationId: ListAiTokens
-            parameters:
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "tokens":
-                                    - "change": 1.5
-                                      "change7d": 1.5
-                                      "name": "WorldMonitor Analyst"
-                                      "price": 75.25
-                                      "sparkline":
-                                          - 1.5
-                                      "symbol": "AAPL"
                             schema:
                                 $ref: '#/components/schemas/ListAiTokensResponse'
                 "400":
@@ -2051,84 +587,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/list-other-tokens:
         get:
             tags:
@@ -2136,29 +601,11 @@ paths:
             summary: ListOtherTokens
             description: ListOtherTokens retrieves other/trending crypto token prices and changes.
             operationId: ListOtherTokens
-            parameters:
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "tokens":
-                                    - "change": 1.5
-                                      "change7d": 1.5
-                                      "name": "WorldMonitor Analyst"
-                                      "price": 75.25
-                                      "sparkline":
-                                          - 1.5
-                                      "symbol": "AAPL"
                             schema:
                                 $ref: '#/components/schemas/ListOtherTokensResponse'
                 "400":
@@ -2166,84 +613,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/get-fear-greed-index:
         get:
             tags:
@@ -2251,31 +627,11 @@ paths:
             summary: GetFearGreedIndex
             description: GetFearGreedIndex retrieves the composite Fear & Greed sentiment index.
             operationId: GetFearGreedIndex
-            parameters:
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "aaiiBear": 1.5
-                                "aaiiBull": 1.5
-                                "breadth":
-                                    "contribution": 1.5
-                                    "degraded": true
-                                    "inputsJson": "example"
-                                    "score": 42.5
-                                    "weight": 1.5
-                                "cnnFearGreed": 1.5
-                                "cnnLabel": "example"
                             schema:
                                 $ref: '#/components/schemas/GetFearGreedIndexResponse'
                 "400":
@@ -2283,84 +639,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/list-earnings-calendar:
         get:
             tags:
@@ -2373,22 +658,12 @@ paths:
                   in: query
                   description: Inclusive lower date bound in YYYY-MM-DD format.
                   required: false
-                  example: "2026-01-15"
                   schema:
                     type: string
                 - name: toDate
                   in: query
                   description: Inclusive upper date bound in YYYY-MM-DD format.
                   required: false
-                  example: "2026-01-15"
-                  schema:
-                    type: string
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
                   schema:
                     type: string
             responses:
@@ -2396,17 +671,6 @@ paths:
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "earnings":
-                                    - "company": "example"
-                                      "date": "2026-01-15"
-                                      "epsActual": 1.5
-                                      "epsEstimate": 1.5
-                                      "hasActuals": true
-                                "fromDate": "2026-01-15"
-                                "toDate": "2026-01-15"
-                                "total": 1
-                                "unavailable": false
                             schema:
                                 $ref: '#/components/schemas/ListEarningsCalendarResponse'
                 "400":
@@ -2414,84 +678,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/get-cot-positioning:
         get:
             tags:
@@ -2499,29 +692,11 @@ paths:
             summary: GetCotPositioning
             description: GetCotPositioning retrieves CFTC COT institutional positioning data.
             operationId: GetCotPositioning
-            parameters:
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "instruments":
-                                    - "assetManagerLong": "1717200000000"
-                                      "assetManagerShort": "1717200000000"
-                                      "code": "example"
-                                      "dealerLong": "1717200000000"
-                                      "dealerShort": "1717200000000"
-                                "reportDate": "2026-01-15"
-                                "unavailable": false
                             schema:
                                 $ref: '#/components/schemas/GetCotPositioningResponse'
                 "400":
@@ -2529,84 +704,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/get-insider-transactions:
         get:
             tags:
@@ -2618,16 +722,7 @@ paths:
                 - name: symbol
                   in: query
                   description: Stock ticker symbol for insider transaction lookup.
-                  required: true
-                  example: "AAPL"
-                  schema:
-                    type: string
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
                   required: false
-                  example: "keys(@)"
                   schema:
                     type: string
             responses:
@@ -2635,12 +730,6 @@ paths:
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "fetchedAt": "2026-01-15T12:00:00Z"
-                                "netValue": 1.5
-                                "symbol": "AAPL"
-                                "totalBuys": 1
-                                "totalSells": 1
                             schema:
                                 $ref: '#/components/schemas/GetInsiderTransactionsResponse'
                 "400":
@@ -2648,84 +737,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/get-market-breadth-history:
         get:
             tags:
@@ -2733,30 +751,11 @@ paths:
             summary: GetMarketBreadthHistory
             description: GetMarketBreadthHistory retrieves historical % of S&P 500 stocks above 20/50/200-day SMAs.
             operationId: GetMarketBreadthHistory
-            parameters:
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "currentPctAbove200d": 1.5
-                                "currentPctAbove20d": 1.5
-                                "currentPctAbove50d": 1.5
-                                "history":
-                                    - "date": "2026-01-15"
-                                      "pctAbove200d": 1.5
-                                      "pctAbove20d": 1.5
-                                      "pctAbove50d": 1.5
-                                "unavailable": false
                             schema:
                                 $ref: '#/components/schemas/GetMarketBreadthHistoryResponse'
                 "400":
@@ -2764,84 +763,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/get-gold-intelligence:
         get:
             tags:
@@ -2849,69 +777,11 @@ paths:
             summary: GetGoldIntelligence
             description: GetGoldIntelligence retrieves gold pricing, cross-currency XAU, ratios, and CFTC positioning.
             operationId: GetGoldIntelligence
-            parameters:
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "cbReserves":
-                                    "asOfMonth": "example"
-                                    "topBuyers12m":
-                                        - "deltaTonnes12m": 1.5
-                                          "iso3": "USA"
-                                          "name": "WorldMonitor Analyst"
-                                    "topHolders":
-                                        - "iso3": "USA"
-                                          "name": "WorldMonitor Analyst"
-                                          "pctOfReserves": 1.5
-                                          "tonnes": 1.5
-                                    "topSellers12m":
-                                        - "deltaTonnes12m": 1.5
-                                          "iso3": "USA"
-                                          "name": "WorldMonitor Analyst"
-                                    "totalTonnes": 1
-                                "cot":
-                                    "managedMoney":
-                                        "longPositions": "1717200000000"
-                                        "netPct": 1.5
-                                        "oiSharePct": 1.5
-                                        "shortPositions": "1717200000000"
-                                        "wowNetDelta": "1717200000000"
-                                    "nextReleaseDate": "2026-01-15"
-                                    "openInterest": "1717200000000"
-                                    "producerSwap":
-                                        "longPositions": "1717200000000"
-                                        "netPct": 1.5
-                                        "oiSharePct": 1.5
-                                        "shortPositions": "1717200000000"
-                                        "wowNetDelta": "1717200000000"
-                                    "reportDate": "2026-01-15"
-                                "crossCurrencyPrices":
-                                    - "currency": "USD"
-                                      "flag": "example"
-                                      "price": 75.25
-                                "drivers":
-                                    - "changePct": 1.5
-                                      "correlation30d": 1.5
-                                      "label": "example"
-                                      "symbol": "AAPL"
-                                      "value": 1.5
-                                "etfFlows":
-                                    "asOfDate": "2026-01-15"
-                                    "aumUsd": 1.5
-                                    "changeM1Pct": 1.5
-                                    "changeM1Tonnes": 1.5
-                                    "changeW1Pct": 1.5
                             schema:
                                 $ref: '#/components/schemas/GetGoldIntelligenceResponse'
                 "400":
@@ -2919,84 +789,13 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
     /api/market/v1/get-hyperliquid-flow:
         get:
             tags:
@@ -3004,32 +803,11 @@ paths:
             summary: GetHyperliquidFlow
             description: GetHyperliquidFlow retrieves Hyperliquid perp positioning flow (funding/OI/basis composite scores).
             operationId: GetHyperliquidFlow
-            parameters:
-                - name: jmespath
-                  in: query
-                  description: |-
-                    Optional JMESPath expression applied server-side to project or reduce the JSON response before it is returned (mirrors the MCP jmespath argument). Invalid expressions, expressions larger than 1024 UTF-8 bytes, or projections that exceed the 256 KB output cap return HTTP 400 with a {_jmespath_error, original_keys} envelope. Grammar and worked examples: https://www.worldmonitor.app/docs/mcp-jmespath.
-                  required: false
-                  example: "keys(@)"
-                  schema:
-                    type: string
             responses:
                 "200":
                     description: Successful response
                     content:
                         application/json:
-                            example:
-                                "assetCount": 1
-                                "assets":
-                                    - "alerts":
-                                        - "example"
-                                      "assetClass": "example"
-                                      "basisScore": 42.5
-                                      "composite": 1.5
-                                      "dayNotional": "example"
-                                "fetchedAt": "2026-01-15T12:00:00Z"
-                                "ts": "1717200000000"
-                                "unavailable": false
                             schema:
                                 $ref: '#/components/schemas/GetHyperliquidFlowResponse'
                 "400":
@@ -3037,125 +815,15 @@ paths:
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/ValidationError'
-                                    - $ref: '#/components/schemas/JmespathProjectionError'
-                "401":
-                    description: Missing or invalid API key.
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/UnauthorizedError'
-                "403":
-                    description: API access requires an active subscription (the API key's subscription is inactive or expired).
-                    headers:
-                        X-Billing-Verification:
-                            description: Present when the 403 is a billing-provider-confirmed subscription lapse (value subscription_lapsed, matching the body `code`).
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenError'
-                "429":
-                    description: Rate limit exceeded.
-                    headers:
-                        X-RateLimit-Limit:
-                            description: Maximum requests allowed in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Remaining:
-                            description: Requests remaining in the active rate-limit window.
-                            schema:
-                                type: string
-                        X-RateLimit-Reset:
-                            description: Unix epoch milliseconds when the active rate-limit window resets.
-                            schema:
-                                type: string
-                        Retry-After:
-                            description: Seconds to wait before retrying the request.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/RateLimitError'
-                "503":
-                    description: Service unavailable. Billing-verification responses include code and X-Billing-Verification; other gateway infrastructure failures use the generic GatewayError shape.
-                    headers:
-                        Retry-After:
-                            description: Seconds to wait before retrying (1-60).
-                            schema:
-                                type: string
-                        X-Billing-Verification:
-                            description: Billing-verification state that produced this response (matches the body `code`).
-                            schema:
-                                type: string
-                        X-Validation-Mode:
-                            description: Present with value degraded when user API-key validation is temporarily unavailable.
-                            schema:
-                                type: string
-                        X-RateLimit-Mode:
-                            description: Present with value degraded when a fail-closed rate-limit dependency is unavailable.
-                            schema:
-                                type: string
-                    content:
-                        application/json:
-                            schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/BillingVerificationError'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/ValidationError'
                 default:
-                    description: Gateway or handler error response.
+                    description: Error response
                     content:
                         application/json:
                             schema:
-                                oneOf:
-                                    - $ref: '#/components/schemas/Error'
-                                    - $ref: '#/components/schemas/GatewayError'
+                                $ref: '#/components/schemas/Error'
 components:
-    securitySchemes:
-        WorldMonitorKey:
-            type: apiKey
-            in: header
-            name: X-WorldMonitor-Key
-            description: User-issued WorldMonitor API key.
-        ApiKeyHeader:
-            type: apiKey
-            in: header
-            name: X-Api-Key
-            description: Alias header for the WorldMonitor API key (X-WorldMonitor-Key).
-        BearerAuth:
-            type: http
-            scheme: bearer
-            description: 'Bearer token: a Clerk-issued JWT for browser session flows, passed as Authorization: Bearer <token>.'
     schemas:
-        JmespathProjectionError:
-            description: Returned when a REST jmespath projection is invalid or exceeds the expression/output byte limits.
-            properties:
-                _jmespath_error:
-                    description: Projection error discriminator and details.
-                    type: string
-                original_keys:
-                    description: Top-level keys or shape of the unprojected response.
-                    items:
-                        type: string
-                    type: array
-            required:
-                - _jmespath_error
-                - original_keys
-            type: object
-        UnauthorizedError:
-            type: object
-            properties:
-                error:
-                    type: string
-                    description: Human-readable error message.
-            required:
-                - error
-            description: Returned when the API key is missing, malformed, or lacks current API access.
         Error:
             type: object
             properties:
@@ -3163,82 +831,6 @@ components:
                     type: string
                     description: Error message (e.g., 'user not found', 'database connection failed')
             description: Error is returned when a handler encounters an error. It contains a simple error message that the developer can customize.
-        BillingVerificationError:
-            type: object
-            description: "Returned with HTTP 503 when paid access cannot be confirmed right now: the billing provider is re-verifying a recently expired subscription, or the entitlement backend is unreachable. Retryable — honor Retry-After."
-            properties:
-                error:
-                    type: string
-                    description: Human-readable billing-verification failure reason.
-                code:
-                    type: string
-                    enum:
-                        - renewal_verification_pending
-                        - renewal_verification_failed
-                        - entitlement_verification_unavailable
-                    description: Machine-readable billing-verification state, mirrored in the X-Billing-Verification response header.
-                requiredTier:
-                    type: integer
-                    format: int32
-                    description: Minimum entitlement tier required for this endpoint, when the denial came from a tier gate.
-            required:
-                - error
-                - code
-        InvalidRequestBodyError:
-            type: object
-            description: Returned when a JSON POST request body is empty or malformed.
-            properties:
-                message:
-                    type: string
-                    description: Invalid request body
-            required:
-                - message
-        GatewayError:
-            type: object
-            description: Returned by gateway infrastructure errors before an RPC handler runs, such as origin, routing, method, authentication, or quota checks.
-            properties:
-                error:
-                    oneOf:
-                        - type: string
-                        - type: object
-                          additionalProperties: true
-                    description: Gateway error reason or structured gateway failure details.
-            required:
-                - error
-        RateLimitError:
-            type: object
-            description: Returned when a gateway or handler rate limit rejects the request.
-            properties:
-                error:
-                    type: string
-                    description: Human-readable rate-limit failure reason.
-            required:
-                - error
-        ForbiddenError:
-            type: object
-            properties:
-                error:
-                    type: string
-                    description: Human-readable entitlement failure reason.
-                code:
-                    type: string
-                    enum:
-                        - subscription_lapsed
-                    description: Machine-readable denial code, present when the 403 is a billing-provider-confirmed subscription lapse (mirrored in the X-Billing-Verification response header).
-                requiredTier:
-                    type: integer
-                    format: int32
-                    description: Minimum entitlement tier required for this endpoint.
-                currentTier:
-                    type: integer
-                    format: int32
-                    description: Caller entitlement tier when known.
-                planKey:
-                    type: string
-                    description: Caller plan key when known.
-            required:
-                - error
-            description: Returned when a PRO-gated endpoint denies access because the caller has no resolved authenticated user, entitlements cannot be verified, or the caller lacks the required entitlement tier.
         FieldViolation:
             type: object
             properties:

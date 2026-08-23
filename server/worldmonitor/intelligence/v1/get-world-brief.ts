@@ -1,5 +1,3 @@
-declare const process: { env: Record<string, string | undefined> };
-
 import type {
   ServerContext,
   GetWorldBriefRequest,
@@ -9,35 +7,39 @@ import type {
 } from '../../../../src/generated/server/worldmonitor/intelligence/v1/service_server';
 
 import { cachedFetchJson } from '../../../_shared/redis';
-import { CHROME_UA } from '../../../_shared/constants';
-import { UPSTREAM_TIMEOUT_MS, GROQ_API_URL, GROQ_MODEL } from './_shared';
+import { callLlm } from '../../../_shared/llm';
 import { listFeedDigest } from '../../news/v1/list-feed-digest';
-import { clusterItems, selectTopStories, publisherFamilyCount } from './_clustering';
+import {
+  clusterItems,
+  selectTopStories,
+  publisherFamilyCount,
+  type RankedCluster,
+} from '../../../../scripts/_clustering.mjs';
 import {
   pickBriefCluster,
   synthesisSystemPrompt,
   synthesisUserPrompt,
   composeSynthesizedBriefResult,
-} from './_insights-brief';
+} from '../../../../scripts/_insights-brief.mjs';
 
 // ========================================================================
 // Constants
 // ========================================================================
 
-// v2: real clustering/scoring/synthesis pipeline (ported from
-// worldmonitor.app's scripts/_clustering.mjs + _insights-brief.mjs), not
-// the v1 Jaccard approximation — bump the cache key so a stale v1 payload
-// never masquerades as the richer shape.
-const BRIEF_CACHE_KEY = 'intel:world-brief:v2';
+// v3: now runs upstream's canonical clustering/synthesis modules directly
+// (scripts/_clustering.mjs + scripts/_insights-brief.mjs) instead of the
+// hand-copied duplicates this fork carried before the upstream merge.
+// Bumped so a cached v2 payload from the copies never serves through this.
+const BRIEF_CACHE_KEY = 'intel:world-brief:v3';
 const BRIEF_CACHE_TTL = 600; // 10 min — matches the "LIVE · Nm ago" cadence in the app
 const MAX_TOP_STORIES = 8;
 
 // ========================================================================
-// Fallback lead (no LLM key, or the synthesis gate rejected the draft)
+// Fallback lead (no LLM available, or the synthesis gate rejected the draft)
 // ========================================================================
 
 function extractiveLead(
-  topStories: Array<{ primaryTitle: string }>,
+  topStories: RankedCluster[],
   criticalCount: number,
   highCount: number,
   sourceCount: number,
@@ -47,33 +49,6 @@ function extractiveLead(
     return `No critical or high-priority signals right now. ${totalCount} stories tracked across ${sourceCount} sources.`;
   }
   return `${criticalCount + highCount} high-priority developments across ${sourceCount} sources. Top signal: ${topStories[0]!.primaryTitle}`;
-}
-
-async function callGroq(systemPrompt: string, userPrompt: string): Promise<string | null> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return null;
-
-  try {
-    const resp = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'User-Agent': CHROME_UA },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.4,
-        max_tokens: 500,
-      }),
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-    });
-    if (!resp.ok) return null;
-    const data = (await resp.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    return data.choices?.[0]?.message?.content?.trim() || null;
-  } catch {
-    return null;
-  }
 }
 
 // ========================================================================
@@ -122,18 +97,26 @@ export async function getWorldBrief(
       let model = '';
       let citations: BriefCitation[] = [];
 
-      // Editorial gate (ported): only synthesize a cited lead when at least
-      // one top story is independently corroborated (>=2 publishers, or
+      // Editorial gate: only synthesize a cited lead when at least one top
+      // story is independently corroborated (>=2 publisher families, or
       // entity corroboration) — never a single-source alert.
       const briefCluster = pickBriefCluster(topStories);
       if (briefCluster && topStories.length > 0) {
         const dateISO = new Date().toISOString().split('T')[0]!;
-        const raw = await callGroq(synthesisSystemPrompt(dateISO), synthesisUserPrompt(topStories));
-        if (raw) {
-          const composed = composeSynthesizedBriefResult(raw, topStories, {
+        const llm = await callLlm({
+          messages: [
+            { role: 'system', content: synthesisSystemPrompt(dateISO) },
+            { role: 'user', content: synthesisUserPrompt(topStories) },
+          ],
+          temperature: 0.4,
+          maxTokens: 800,
+          stage: 'get-world-brief',
+        });
+        if (llm?.content) {
+          const composed = composeSynthesizedBriefResult(llm.content, topStories, {
             briefCluster,
             // Real URLs instead of the default empty-string fallback — kept
-            // in STRICT lockstep with the lead's [n] markers (composer
+            // in STRICT lockstep with the lead's [n] markers (the composer
             // substitutes rather than filters, so citations[i] is always [i+1]).
             sourceFromStory: (story) => ({
               title: story.primaryTitle,
@@ -143,7 +126,7 @@ export async function getWorldBrief(
           });
           if (composed.brief) {
             lead = composed.brief.lead;
-            model = GROQ_MODEL;
+            model = llm.model;
             citations = composed.brief.sources;
           }
         }

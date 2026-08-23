@@ -1,3 +1,8 @@
+// Type declarations for _clustering.mjs, so TypeScript callers outside
+// scripts/ (server/worldmonitor/intelligence/v1/get-world-brief.ts) can
+// import it. Mirrors the .d.mts convention already used by
+// _simulation-queue-constants.mjs.
+
 export interface ClusterThreat {
   level?: string;
   category?: string;
@@ -11,6 +16,7 @@ export interface ClusterInputItem {
   link?: string;
   pubDate?: string | number;
   publishedAt?: string | number;
+  pubDateMissing?: boolean;
   isAlert?: boolean;
   threat?: ClusterThreat;
   tier?: number;
@@ -45,14 +51,16 @@ export interface RankedCluster extends Cluster {
 }
 
 export interface SelectTopStoriesStats {
-  considered: number;
-  admissibilityDropped: number;
-  sourceCapDropped: number;
-  overflowDropped: number;
-  briefEligibleConsidered: number;
-  briefEligiblePromoted: boolean;
+  considered?: number;
+  admissibilityDropped?: number;
+  sourceCapDropped?: number;
+  overflowDropped?: number;
+  briefEligibleConsidered?: number;
+  briefEligiblePromoted?: boolean;
 }
 
+export const DIPLOMACY_KEYWORDS: string[];
+export const ENTITY_BIGRAMS: Array<[string, string]>;
 export const MIN_CORROBORATING_PUBLISHERS: number;
 
 export function clusterItems(items: ClusterInputItem[]): Cluster[];

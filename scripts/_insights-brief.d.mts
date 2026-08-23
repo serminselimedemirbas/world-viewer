@@ -1,4 +1,9 @@
-import type { Cluster } from './_clustering';
+// Type declarations for _insights-brief.mjs, so TypeScript callers outside
+// scripts/ (server/worldmonitor/intelligence/v1/get-world-brief.ts) can
+// import it. Mirrors the .d.mts convention already used by
+// _simulation-queue-constants.mjs.
+
+import type { Cluster } from './_clustering.mjs';
 
 export const BRIEF_REJECTIONS: Readonly<{
   NO_TOP_STORIES: 'no-top-stories';
@@ -22,7 +27,12 @@ export interface ParsedBriefSynthesis {
   lines: Array<{ n: number; text: string }>;
 }
 
-export function parseBriefSynthesis(rawText: string, storyCount: number): ParsedBriefSynthesis | null;
+export function parseBriefSynthesis(
+  rawText: string,
+  storyCount: number,
+): ParsedBriefSynthesis | null;
+
+export const storyGroundText: (story: Cluster) => string;
 
 export function maskAttributedSources(text: string, sources: unknown[]): string;
 

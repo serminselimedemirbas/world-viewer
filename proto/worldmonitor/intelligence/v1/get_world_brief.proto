@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package worldmonitor.intelligence.v1;
 
+import "sebuf/http/annotations.proto";
+
 // GetWorldBriefRequest has no parameters — always returns the current
 // global situation brief (short-TTL cached; regenerated on demand).
 message GetWorldBriefRequest {}
@@ -11,7 +13,9 @@ message GetWorldBriefRequest {}
 message GetWorldBriefResponse {
   string lead = 1;
   string model = 2;
-  int64 generated_at = 3;
+  // Encoded as a JSON number (not the protobuf-default string) so clients
+  // read it as a plain epoch-ms timestamp — matches GetCountryIntelBrief.
+  int64 generated_at = 3 [(sebuf.http.int64_encoding) = INT64_ENCODING_NUMBER];
   WorldBriefStats stats = 4;
   // Numbered sources for the [n] citation markers embedded in `lead` —
   // citations[0] is [1], citations[1] is [2], etc.
