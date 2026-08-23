@@ -1,5 +1,9 @@
-#!/usr/bin/env node
-
+// NOTE: no `#!/usr/bin/env node` shebang. This module is only ever
+// imported (seed-insights.mjs, _insights-brief.mjs,
+// _insights-synthesis-diagnostics.mjs, and the get-world-brief RPC
+// handler), never executed directly, and the shebang broke the esbuild
+// bundle once server code started importing it. Matches the sibling
+// importable module _simulation-queue-constants.mjs.
 import { createRequire } from 'node:module';
 // #4919: story similarity is delegated to the shared story-identity
 // module (scripts/shared mirror — same rootDirectory=scripts reason as
