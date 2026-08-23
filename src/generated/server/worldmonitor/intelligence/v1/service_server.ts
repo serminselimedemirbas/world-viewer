@@ -164,6 +164,13 @@ export interface GetWorldBriefResponse {
   model: string;
   generatedAt: number;
   stats?: WorldBriefStats;
+  citations: BriefCitation[];
+}
+
+export interface BriefCitation {
+  title: string;
+  source: string;
+  url: string;
 }
 
 export interface WorldBriefStats {

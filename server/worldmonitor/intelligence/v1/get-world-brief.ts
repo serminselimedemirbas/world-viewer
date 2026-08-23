@@ -5,6 +5,7 @@ import type {
   GetWorldBriefRequest,
   GetWorldBriefResponse,
   WorldBriefStats,
+  BriefCitation,
 } from '../../../../src/generated/server/worldmonitor/intelligence/v1/service_server';
 
 import { cachedFetchJson } from '../../../_shared/redis';
@@ -88,6 +89,7 @@ export async function getWorldBrief(
     model: '',
     generatedAt: Date.now(),
     stats: { stories: 0, clusters: 0, multiSource: 0, sources: 0, critical: 0, high: 0, alerts: 0 },
+    citations: [],
   };
 
   let result: GetWorldBriefResponse | null = null;
@@ -118,6 +120,7 @@ export async function getWorldBrief(
 
       let lead = '';
       let model = '';
+      let citations: BriefCitation[] = [];
 
       // Editorial gate (ported): only synthesize a cited lead when at least
       // one top story is independently corroborated (>=2 publishers, or
@@ -127,10 +130,21 @@ export async function getWorldBrief(
         const dateISO = new Date().toISOString().split('T')[0]!;
         const raw = await callGroq(synthesisSystemPrompt(dateISO), synthesisUserPrompt(topStories));
         if (raw) {
-          const composed = composeSynthesizedBriefResult(raw, topStories, { briefCluster });
+          const composed = composeSynthesizedBriefResult(raw, topStories, {
+            briefCluster,
+            // Real URLs instead of the default empty-string fallback — kept
+            // in STRICT lockstep with the lead's [n] markers (composer
+            // substitutes rather than filters, so citations[i] is always [i+1]).
+            sourceFromStory: (story) => ({
+              title: story.primaryTitle,
+              source: story.primarySource,
+              url: story.primaryLink || '',
+            }),
+          });
           if (composed.brief) {
             lead = composed.brief.lead;
             model = GROQ_MODEL;
+            citations = composed.brief.sources;
           }
         }
       }
@@ -149,7 +163,7 @@ export async function getWorldBrief(
         alerts,
       };
 
-      return { lead, model, generatedAt: Date.now(), stats };
+      return { lead, model, generatedAt: Date.now(), stats, citations };
     });
   } catch {
     return empty;

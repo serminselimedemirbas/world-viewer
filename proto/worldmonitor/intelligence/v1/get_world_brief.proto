@@ -13,6 +13,9 @@ message GetWorldBriefResponse {
   string model = 2;
   int64 generated_at = 3;
   WorldBriefStats stats = 4;
+  // Numbered sources for the [n] citation markers embedded in `lead` —
+  // citations[0] is [1], citations[1] is [2], etc.
+  repeated BriefCitation citations = 5;
 }
 
 message WorldBriefStats {
@@ -23,4 +26,10 @@ message WorldBriefStats {
   int32 critical = 5;
   int32 high = 6;
   int32 alerts = 7;
+}
+
+message BriefCitation {
+  string title = 1;
+  string source = 2;
+  string url = 3;
 }
