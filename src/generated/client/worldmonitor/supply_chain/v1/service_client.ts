@@ -52,6 +52,7 @@ export interface ChokepointInfo {
   description: string;
   aisDisruptions: number;
   directions: string[];
+  /** @deprecated */
   directionalDwt: DirectionalDwt[];
   transitSummary?: TransitSummary;
   flowEstimate?: FlowEstimate;

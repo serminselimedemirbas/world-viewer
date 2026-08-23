@@ -574,20 +574,6 @@ function sebufApiPlugin(): Plugin {
         }
       });
 
-      // ── Fork-specific: this deployment serves the API only ──
-      // Mirrors the same guard in middleware.ts so `vite dev` behaves like
-      // production here.
-      server.middlewares.use((req, res, next) => {
-        const pathname = req.url?.split('?')[0];
-        if (pathname === '/' || pathname === '/index.html') {
-          res.statusCode = 404;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ error: 'Not Found', message: 'This server serves API only.' }));
-          return;
-        }
-        next();
-      });
-
       // Legacy v1 URL aliases → new sebuf RPC paths (mirror of the alias files
       // in api/scenario/v1/ + api/supply-chain/v1/). Vercel serves the alias
       // files directly; vite dev has no file-based routing for api/, so we

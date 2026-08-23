@@ -307,6 +307,7 @@ export interface XFeedItem {
 }
 
 export interface GetCompanyEnrichmentRequest {
+  /** @deprecated */
   domain: string;
   name: string;
   ticker: string;
@@ -314,9 +315,12 @@ export interface GetCompanyEnrichmentRequest {
 
 export interface GetCompanyEnrichmentResponse {
   company?: EnrichedCompany;
+  /** @deprecated */
   github?: EnrichedGithub;
+  /** @deprecated */
   techStack: TechStackItem[];
   secFilings?: SecFilings;
+  /** @deprecated */
   hackerNewsMentions: HNMention[];
   enrichedAtMs: number;
   sources: string[];
@@ -332,6 +336,7 @@ export interface EnrichedCompany {
   description: string;
   location: string;
   website: string;
+  /** @deprecated */
   founded: number;
   cik: string;
   ticker: string;
@@ -399,12 +404,14 @@ export interface CompanyNewsMention {
 
 export interface ListCompanySignalsRequest {
   company: string;
+  /** @deprecated */
   domain: string;
   ticker: string;
 }
 
 export interface ListCompanySignalsResponse {
   company: string;
+  /** @deprecated */
   domain: string;
   signals: CompanySignal[];
   summary?: SignalSummary;
@@ -1054,33 +1061,6 @@ export interface GetSimilarEventsResponse {
   situation: string;
   partial: boolean;
   upstreamUnavailable: boolean;
-}
-
-export interface GetWorldBriefRequest {
-}
-
-export interface GetWorldBriefResponse {
-  lead: string;
-  model: string;
-  generatedAt: number;
-  stats?: WorldBriefStats;
-  citations: BriefCitation[];
-}
-
-export interface WorldBriefStats {
-  stories: number;
-  clusters: number;
-  multiSource: number;
-  sources: number;
-  critical: number;
-  high: number;
-  alerts: number;
-}
-
-export interface BriefCitation {
-  title: string;
-  source: string;
-  url: string;
 }
 
 export type SeverityLevel = "SEVERITY_LEVEL_UNSPECIFIED" | "SEVERITY_LEVEL_LOW" | "SEVERITY_LEVEL_MEDIUM" | "SEVERITY_LEVEL_HIGH";
@@ -1961,29 +1941,6 @@ export class IntelligenceServiceClient {
     }
 
     return await resp.json() as GetSimilarEventsResponse;
-  }
-
-  async getWorldBrief(_req: GetWorldBriefRequest, options?: IntelligenceServiceCallOptions): Promise<GetWorldBriefResponse> {
-    let path = "/api/intelligence/v1/get-world-brief";
-    const url = this.baseURL + path;
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...this.defaultHeaders,
-      ...options?.headers,
-    };
-
-    const resp = await this.fetchFn(url, {
-      method: "GET",
-      headers,
-      signal: options?.signal,
-    });
-
-    if (!resp.ok) {
-      return this.handleError(resp);
-    }
-
-    return await resp.json() as GetWorldBriefResponse;
   }
 
   private async handleError(resp: Response): Promise<never> {

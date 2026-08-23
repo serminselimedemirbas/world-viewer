@@ -4,7 +4,6 @@ package worldmonitor.intelligence.v1;
 import "sebuf/http/annotations.proto";
 import "worldmonitor/intelligence/v1/classify_event.proto";
 import "worldmonitor/intelligence/v1/deduct_situation.proto";
-import "worldmonitor/intelligence/v1/get_world_brief.proto";
 import "worldmonitor/intelligence/v1/get_company_enrichment.proto";
 import "worldmonitor/intelligence/v1/get_country_facts.proto";
 import "worldmonitor/intelligence/v1/get_country_intel_brief.proto";
@@ -260,11 +259,5 @@ service IntelligenceService {
   // so it is likewise embeddings-backed and rate-policied. Premium-gated.
   rpc GetSimilarEvents(GetSimilarEventsRequest) returns (GetSimilarEventsResponse) {
     option (sebuf.http.config) = {path: "/get-similar-events", method: HTTP_METHOD_POST};
-  }
-
-  // GetWorldBrief retrieves an AI-synthesized summary of the current top
-  // global stories across all tracked categories (Groq).
-  rpc GetWorldBrief(GetWorldBriefRequest) returns (GetWorldBriefResponse) {
-    option (sebuf.http.config) = {path: "/get-world-brief", method: HTTP_METHOD_GET};
   }
 }

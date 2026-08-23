@@ -314,7 +314,6 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/intelligence/v1/get-country-risk': 'slow',
   '/api/intelligence/v1/get-risk-scores': 'slow',
   '/api/intelligence/v1/get-pizzint-status': 'slow',
-  '/api/intelligence/v1/get-world-brief': 'fast',
   '/api/intelligence/v1/classify-event': 'static',
   '/api/intelligence/v1/search-gdelt-documents': 'slow',
   '/api/infrastructure/v1/get-cable-health': 'slow',

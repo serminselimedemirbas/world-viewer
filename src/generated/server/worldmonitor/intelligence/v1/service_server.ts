@@ -307,6 +307,7 @@ export interface XFeedItem {
 }
 
 export interface GetCompanyEnrichmentRequest {
+  /** @deprecated */
   domain: string;
   name: string;
   ticker: string;
@@ -314,9 +315,12 @@ export interface GetCompanyEnrichmentRequest {
 
 export interface GetCompanyEnrichmentResponse {
   company?: EnrichedCompany;
+  /** @deprecated */
   github?: EnrichedGithub;
+  /** @deprecated */
   techStack: TechStackItem[];
   secFilings?: SecFilings;
+  /** @deprecated */
   hackerNewsMentions: HNMention[];
   enrichedAtMs: number;
   sources: string[];
@@ -332,6 +336,7 @@ export interface EnrichedCompany {
   description: string;
   location: string;
   website: string;
+  /** @deprecated */
   founded: number;
   cik: string;
   ticker: string;
@@ -399,12 +404,14 @@ export interface CompanyNewsMention {
 
 export interface ListCompanySignalsRequest {
   company: string;
+  /** @deprecated */
   domain: string;
   ticker: string;
 }
 
 export interface ListCompanySignalsResponse {
   company: string;
+  /** @deprecated */
   domain: string;
   signals: CompanySignal[];
   summary?: SignalSummary;
@@ -1056,33 +1063,6 @@ export interface GetSimilarEventsResponse {
   upstreamUnavailable: boolean;
 }
 
-export interface GetWorldBriefRequest {
-}
-
-export interface GetWorldBriefResponse {
-  lead: string;
-  model: string;
-  generatedAt: number;
-  stats?: WorldBriefStats;
-  citations: BriefCitation[];
-}
-
-export interface WorldBriefStats {
-  stories: number;
-  clusters: number;
-  multiSource: number;
-  sources: number;
-  critical: number;
-  high: number;
-  alerts: number;
-}
-
-export interface BriefCitation {
-  title: string;
-  source: string;
-  url: string;
-}
-
 export type SeverityLevel = "SEVERITY_LEVEL_UNSPECIFIED" | "SEVERITY_LEVEL_LOW" | "SEVERITY_LEVEL_MEDIUM" | "SEVERITY_LEVEL_HIGH";
 
 export type TrendDirection = "TREND_DIRECTION_UNSPECIFIED" | "TREND_DIRECTION_RISING" | "TREND_DIRECTION_STABLE" | "TREND_DIRECTION_FALLING";
@@ -1174,7 +1154,6 @@ export interface IntelligenceServiceHandler {
   searchIntelHistory(ctx: ServerContext, req: SearchIntelHistoryRequest): Promise<SearchIntelHistoryResponse>;
   getIntelTimeline(ctx: ServerContext, req: GetIntelTimelineRequest): Promise<GetIntelTimelineResponse>;
   getSimilarEvents(ctx: ServerContext, req: GetSimilarEventsRequest): Promise<GetSimilarEventsResponse>;
-  getWorldBrief(ctx: ServerContext, req: GetWorldBriefRequest): Promise<GetWorldBriefResponse>;
 }
 
 export function createIntelligenceServiceRoutes(
@@ -2642,43 +2621,6 @@ export function createIntelligenceServiceRoutes(
 
           const result = await handler.getSimilarEvents(ctx, body);
           return new Response(JSON.stringify(result as GetSimilarEventsResponse), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        } catch (err: unknown) {
-          if (err instanceof ValidationError) {
-            return new Response(JSON.stringify({ violations: err.violations }), {
-              status: 400,
-              headers: { "Content-Type": "application/json" },
-            });
-          }
-          if (options?.onError) {
-            return options.onError(err, req);
-          }
-          const message = err instanceof Error ? err.message : String(err);
-          return new Response(JSON.stringify({ message }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-      },
-    },
-    {
-      method: "GET",
-      path: "/api/intelligence/v1/get-world-brief",
-      handler: async (req: Request): Promise<Response> => {
-        try {
-          const pathParams: Record<string, string> = {};
-          const body = {} as GetWorldBriefRequest;
-
-          const ctx: ServerContext = {
-            request: req,
-            pathParams,
-            headers: Object.fromEntries(req.headers.entries()),
-          };
-
-          const result = await handler.getWorldBrief(ctx, body);
-          return new Response(JSON.stringify(result as GetWorldBriefResponse), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });

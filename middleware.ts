@@ -183,18 +183,6 @@ export default function middleware(request: Request) {
   const path = url.pathname;
   const host = normalizeHost(request.headers.get('host') ?? url.hostname);
 
-  // ── Fork-specific: this deployment serves the API only ──
-  // The marketing/landing site lives in a separate project, so the upstream
-  // web app's home page is not served here. Everything below (docs redirects,
-  // variant OG stubs, MCP canonicalization, bot filtering) is upstream's and
-  // still applies to the paths it targets.
-  if (path === '/' || path === '/index.html') {
-    return new Response('{"error":"Not Found","message":"This deployment serves API only."}', {
-      status: 404,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
   if (path === '/' && hasLegacyDashboardRootState(url.searchParams)) {
     const dashboardUrl = new URL(request.url);
     dashboardUrl.pathname = '/dashboard';
