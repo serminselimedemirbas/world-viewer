@@ -14125,6 +14125,9 @@
           "path": "api/youtube/live.js"
         },
         {
+          "path": "api/youtube/sources.ts"
+        },
+        {
           "path": "scripts/ais-relay.cjs"
         },
         {
