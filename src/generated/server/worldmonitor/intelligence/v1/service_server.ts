@@ -149,6 +149,33 @@ export interface DeductSituationResponse {
   provider: string;
 }
 
+// MANUALLY ADDED — proto source added (get_world_brief.proto + service.proto
+// rpc entry) but `buf generate` could not be re-run cleanly: the installed
+// sebuf v0.7.0 toolchain regenerates this file from a service.proto that no
+// longer declares `rpc DeductSituation` (pre-existing proto/generated drift,
+// unrelated to this change) and would silently drop that block. Run
+// `make generate` once that drift is resolved to fold this in properly —
+// the shape below matches what codegen would emit.
+export interface GetWorldBriefRequest {
+}
+
+export interface GetWorldBriefResponse {
+  lead: string;
+  model: string;
+  generatedAt: number;
+  stats?: WorldBriefStats;
+}
+
+export interface WorldBriefStats {
+  stories: number;
+  clusters: number;
+  multiSource: number;
+  sources: number;
+  critical: number;
+  high: number;
+  alerts: number;
+}
+
 export type SeverityLevel = "SEVERITY_LEVEL_UNSPECIFIED" | "SEVERITY_LEVEL_LOW" | "SEVERITY_LEVEL_MEDIUM" | "SEVERITY_LEVEL_HIGH";
 
 export type TrendDirection = "TREND_DIRECTION_UNSPECIFIED" | "TREND_DIRECTION_RISING" | "TREND_DIRECTION_STABLE" | "TREND_DIRECTION_FALLING";
@@ -206,6 +233,7 @@ export interface IntelligenceServiceHandler {
   getCountryIntelBrief(ctx: ServerContext, req: GetCountryIntelBriefRequest): Promise<GetCountryIntelBriefResponse>;
   searchGdeltDocuments(ctx: ServerContext, req: SearchGdeltDocumentsRequest): Promise<SearchGdeltDocumentsResponse>;
   deductSituation(ctx: ServerContext, req: DeductSituationRequest): Promise<DeductSituationResponse>;
+  getWorldBrief(ctx: ServerContext, req: GetWorldBriefRequest): Promise<GetWorldBriefResponse>;
 }
 
 export function createIntelligenceServiceRoutes(
@@ -465,6 +493,43 @@ export function createIntelligenceServiceRoutes(
 
           const result = await handler.deductSituation(ctx, body);
           return new Response(JSON.stringify(result as DeductSituationResponse), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (err: unknown) {
+          if (err instanceof ValidationError) {
+            return new Response(JSON.stringify({ violations: err.violations }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          if (options?.onError) {
+            return options.onError(err, req);
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          return new Response(JSON.stringify({ message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/intelligence/v1/get-world-brief",
+      handler: async (req: Request): Promise<Response> => {
+        try {
+          const pathParams: Record<string, string> = {};
+          const body = {} as GetWorldBriefRequest;
+
+          const ctx: ServerContext = {
+            request: req,
+            pathParams,
+            headers: Object.fromEntries(req.headers.entries()),
+          };
+
+          const result = await handler.getWorldBrief(ctx, body);
+          return new Response(JSON.stringify(result as GetWorldBriefResponse), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
