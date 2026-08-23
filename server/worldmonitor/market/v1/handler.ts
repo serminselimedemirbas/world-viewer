@@ -21,14 +21,46 @@ import { listStablecoinMarkets } from './list-stablecoin-markets';
 import { listEtfFlows } from './list-etf-flows';
 import { getCountryStockIndex } from './get-country-stock-index';
 import { listGulfQuotes } from './list-gulf-quotes';
+import { analyzeStock } from './analyze-stock';
+import { getStockAnalysisHistory } from './get-stock-analysis-history';
+import { backtestStock } from './backtest-stock';
+import { listStoredStockBacktests } from './list-stored-stock-backtests';
+import { listCryptoSectors } from './list-crypto-sectors';
+import { listDefiTokens } from './list-defi-tokens';
+import { listAiTokens } from './list-ai-tokens';
+import { listOtherTokens } from './list-other-tokens';
+import { getFearGreedIndex } from './get-fear-greed-index';
+import { listEarningsCalendar } from './list-earnings-calendar';
+import { getCotPositioning } from './get-cot-positioning';
+import { getInsiderTransactions } from './get-insider-transactions';
+import { getMarketBreadthHistory } from './get-market-breadth-history';
+import { getGoldIntelligence } from './get-gold-intelligence';
+import { getHyperliquidFlow } from './get-hyperliquid-flow';
+import { getPhysicalPremiums } from './get-physical-premiums';
 
 export const marketHandler: MarketServiceHandler = {
   listMarketQuotes,
   listCryptoQuotes,
   listCommodityQuotes,
+  getPhysicalPremiums,
   getSectorSummary,
   listStablecoinMarkets,
   listEtfFlows,
   getCountryStockIndex,
   listGulfQuotes,
+  analyzeStock,
+  getStockAnalysisHistory,
+  backtestStock,
+  listStoredStockBacktests,
+  listCryptoSectors,
+  listDefiTokens,
+  listAiTokens,
+  listOtherTokens,
+  getFearGreedIndex,
+  listEarningsCalendar,
+  getCotPositioning,
+  getInsiderTransactions,
+  getMarketBreadthHistory,
+  getGoldIntelligence,
+  getHyperliquidFlow,
 };

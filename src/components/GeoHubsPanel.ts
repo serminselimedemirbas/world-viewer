@@ -1,8 +1,9 @@
 import { Panel } from './Panel';
 import type { GeoHubActivity } from '@/services/geo-activity';
-import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
+import { escapeHtml, sanitizeUrl, unsafeRawHtml } from '@/utils/sanitize';
 import { t } from '@/services/i18n';
 import { getCSSColor } from '@/utils';
+import { bindActivationKeys } from '@/utils/activation';
 
 const COUNTRY_FLAGS: Record<string, string> = {
   'USA': '🇺🇸', 'Russia': '🇷🇺', 'China': '🇨🇳', 'UK': '🇬🇧', 'Belgium': '🇧🇪',
@@ -43,6 +44,8 @@ export class GeoHubsPanel extends Panel {
         lowColor: getCSSColor('--text-dim'),
       }),
     });
+    this.setupDelegatedListeners();
+    bindActivationKeys(this.content, '.geo-hub-item');
   }
 
   public setOnHubClick(handler: (hub: GeoHubActivity) => void): void {
@@ -79,7 +82,7 @@ export class GeoHubsPanel extends Panel {
       const topStory = hub.topStories[0];
 
       return `
-        <div class="geo-hub-item ${hub.activityLevel}" data-hub-id="${escapeHtml(hub.hubId)}" data-index="${index}">
+        <div class="geo-hub-item ${hub.activityLevel}" data-hub-id="${escapeHtml(hub.hubId)}" data-index="${index}" role="button" tabindex="0">
           <div class="hub-rank">${index + 1}</div>
           <span class="geo-hub-indicator ${hub.activityLevel}"></span>
           <div class="hub-info">
@@ -104,20 +107,23 @@ export class GeoHubsPanel extends Panel {
       `;
     }).join('');
 
-    this.setContent(html);
-    this.bindEvents();
+    this.setSafeContent(unsafeRawHtml(html, 'legacy Panel.setContent() migration'));
   }
 
-  private bindEvents(): void {
-    const items = this.content.querySelectorAll<HTMLDivElement>('.geo-hub-item');
-    items.forEach((item) => {
-      item.addEventListener('click', () => {
-        const hubId = item.dataset.hubId;
-        const hub = this.activities.find(a => a.hubId === hubId);
-        if (hub && this.onHubClick) {
-          this.onHubClick(hub);
-        }
-      });
+  /**
+   * Attach a single delegated click listener on the container so that
+   * re-renders (which replace innerHTML) never accumulate listeners.
+   */
+  private setupDelegatedListeners(): void {
+    this.content.addEventListener('click', (e: Event) => {
+      const target = e.target as HTMLElement;
+      const item = target.closest<HTMLDivElement>('.geo-hub-item');
+      if (!item) return;
+      const hubId = item.dataset.hubId;
+      const hub = this.activities.find(a => a.hubId === hubId);
+      if (hub && this.onHubClick) {
+        this.onHubClick(hub);
+      }
     });
   }
 }

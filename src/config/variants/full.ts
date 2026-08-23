@@ -12,7 +12,8 @@ export * from '../irradiators';
 export * from '../pipelines';
 export * from '../ports';
 export * from '../military';
-export * from '../airports';
+// airports intentionally not re-exported here — keeps the airports table off the
+// eager variant/@/config barrel; AviationCommandBar imports it directly. (#4404)
 export * from '../entities';
 
 // Panel configuration for geopolitical analysis
@@ -37,6 +38,9 @@ export const DEFAULT_PANELS: Record<string, PanelConfig> = {
   polymarket: { name: 'Predictions', enabled: true, priority: 1 },
   commodities: { name: 'Commodities', enabled: true, priority: 1 },
   markets: { name: 'Markets', enabled: true, priority: 1 },
+  'stock-analysis': { name: 'Stock Analysis', enabled: true, priority: 1 },
+  'stock-backtest': { name: 'Backtesting', enabled: true, priority: 1 },
+  'daily-market-brief': { name: 'Daily Market Brief', enabled: true, priority: 1 },
   economic: { name: 'Economic Indicators', enabled: true, priority: 1 },
   finance: { name: 'Financial', enabled: true, priority: 1 },
   tech: { name: 'Technology', enabled: true, priority: 2 },
@@ -53,6 +57,9 @@ export const DEFAULT_PANELS: Record<string, PanelConfig> = {
 // Map layers for geopolitical view
 export const DEFAULT_MAP_LAYERS: MapLayers = {
   gpsJamming: false,
+  satellites: false,
+
+
   conflicts: true,
   bases: true,
   cables: false,
@@ -63,7 +70,15 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   irradiators: false,
   sanctions: true,
   weather: true,
-  economic: true,
+  // Opt-in: all five road feeds are on-demand bootstrap keys. Default-on made
+  // every visitor fetch them, which is exactly what the on-demand tier is meant
+  // to prevent. Narrowest surface on the map, so it follows military/flights/fires
+  // rather than the global layers above it (#6763).
+  canadaRoads: false,
+  // Stays on: it rides the fast tier already hydrated, so enabling it costs no
+  // extra request, and it carries provincial emergency alerts.
+  canadaAlerts: true,
+  economic: false,
   waterways: true,
   outages: true,
   cyberThreats: false,
@@ -71,7 +86,7 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   protests: false,
   flights: false,
   military: false,
-  natural: true,
+  natural: false,
   spaceports: false,
   minerals: false,
   fires: false,
@@ -97,13 +112,24 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   speciesRecovery: false,
   renewableInstallations: false,
   tradeRoutes: false,
-  iranAttacks: false,
+  iranAttacks: true,
+  ciiChoropleth: false,
+  resilienceScore: false,
   dayNight: false,
+  // Commodity variant layers (disabled in full variant)
+  miningSites: false,
+  processingPlants: false,
+  commodityPorts: false,
+  webcams: false,
+  diseaseOutbreaks: false,
 };
 
 // Mobile-specific defaults for geopolitical
 export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   gpsJamming: false,
+  satellites: false,
+
+
   conflicts: true,
   bases: false,
   cables: false,
@@ -114,6 +140,8 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   irradiators: false,
   sanctions: true,
   weather: true,
+  canadaRoads: false,
+  canadaAlerts: false,
   economic: false,
   waterways: false,
   outages: true,
@@ -148,8 +176,16 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   speciesRecovery: false,
   renewableInstallations: false,
   tradeRoutes: false,
-  iranAttacks: false,
+  iranAttacks: true,
+  ciiChoropleth: false,
+  resilienceScore: false,
   dayNight: false,
+  // Commodity variant layers (disabled in full variant)
+  miningSites: false,
+  processingPlants: false,
+  commodityPorts: false,
+  webcams: false,
+  diseaseOutbreaks: false,
 };
 
 export const VARIANT_CONFIG: VariantConfig = {

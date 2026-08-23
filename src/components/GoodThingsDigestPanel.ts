@@ -2,6 +2,9 @@ import { Panel } from './Panel';
 import type { NewsItem } from '@/types';
 import { generateSummary } from '@/services/summarization';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
+import { t } from '@/services/i18n';
+import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
+
 
 /**
  * GoodThingsDigestPanel -- Displays the top 5 positive stories of the day,
@@ -17,7 +20,7 @@ export class GoodThingsDigestPanel extends Panel {
 
   constructor() {
     super({ id: 'digest', title: '5 Good Things', trackActivity: false });
-    this.content.innerHTML = '<p class="digest-placeholder">Loading today\u2019s digest\u2026</p>';
+    setTrustedHtml(this.content, trustedHtml('<p class="digest-placeholder">Loading today\u2019s digest\u2026</p>', "legacy direct innerHTML migration"));
   }
 
   /**
@@ -34,13 +37,14 @@ export class GoodThingsDigestPanel extends Panel {
     const top5 = items.slice(0, 5);
 
     if (top5.length === 0) {
-      this.content.innerHTML = '<p class="digest-placeholder">No stories available</p>';
+      // #6557: a settled empty state is authoritative content.
+      this.setTrustedContent(trustedHtml(`<p class="digest-placeholder">${escapeHtml(t('components.goodThingsDigest.noStories'))}</p>`, "legacy direct innerHTML migration"));
       this.cardElements = [];
       return;
     }
 
-    // Render stub cards immediately (titles only, no summaries yet)
-    this.content.innerHTML = '';
+    // Render stub cards immediately (titles only, no summaries yet).
+    // Build the full list first, then one atomic write (#6557).
     const list = document.createElement('div');
     list.className = 'digest-list';
     this.cardElements = [];
@@ -49,25 +53,34 @@ export class GoodThingsDigestPanel extends Panel {
       const item = top5[i]!;
       const card = document.createElement('div');
       card.className = 'digest-card';
-      card.innerHTML = `
+      setTrustedHtml(card, trustedHtml(`
         <span class="digest-card-number">${i + 1}</span>
         <div class="digest-card-body">
           <a class="digest-card-title" href="${sanitizeUrl(item.link)}" target="_blank" rel="noopener">
             ${escapeHtml(item.title)}
           </a>
           <span class="digest-card-source">${escapeHtml(item.source)}</span>
-          <p class="digest-card-summary digest-card-summary--loading">Summarizing\u2026</p>
+          <p class="digest-card-summary digest-card-summary--loading">${escapeHtml(t('components.goodThingsDigest.summarizing'))}</p>
         </div>
-      `;
+      `, "legacy direct innerHTML migration"));
       list.appendChild(card);
       this.cardElements.push(card);
     }
-    this.content.appendChild(list);
+    this.setContentNodes(list);
+    if (this.isLocked) {
+      // setContentNodes bails on a locked panel, so `list` was never attached.
+      // The liveness guard below reads this.element, which stays connected
+      // while locked, so it would not stop the batch from writing summaries
+      // into an orphaned subtree. Drop the handles instead, as the empty
+      // branch above does.
+      this.cardElements = [];
+      return;
+    }
 
     // Summarize in parallel with progressive updates
     const signal = this.summaryAbort.signal;
     await Promise.allSettled(top5.map(async (item, idx) => {
-      if (signal.aborted) return;
+      if (signal.aborted || !this.element?.isConnected) return;
       try {
         // Pass [title, source] as two headlines to satisfy generateSummary's
         // minimum length requirement (headlines.length >= 2).
@@ -76,11 +89,11 @@ export class GoodThingsDigestPanel extends Panel {
           undefined,
           item.locationName,
         );
-        if (signal.aborted) return;
+        if (signal.aborted || !this.element?.isConnected) return;
         const summary = result?.summary ?? item.title.slice(0, 200);
         this.updateCardSummary(idx, summary);
       } catch {
-        if (!signal.aborted) {
+        if (!signal.aborted && this.element?.isConnected) {
           this.updateCardSummary(idx, item.title.slice(0, 200));
         }
       }

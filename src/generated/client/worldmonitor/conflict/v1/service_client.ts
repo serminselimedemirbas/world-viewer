@@ -83,7 +83,13 @@ export interface HumanitarianCountrySummary {
   updatedAt: number;
 }
 
-export interface ListIranEventsRequest {}
+export interface ListIranEventsRequest {
+}
+
+export interface ListIranEventsResponse {
+  events: IranEvent[];
+  scrapedAt: string;
+}
 
 export interface IranEvent {
   id: string;
@@ -93,13 +99,18 @@ export interface IranEvent {
   latitude: number;
   longitude: number;
   locationName: string;
-  timestamp: number;
+  timestamp: string;
   severity: string;
 }
 
-export interface ListIranEventsResponse {
-  events: IranEvent[];
-  scrapedAt: number;
+export interface GetHumanitarianSummaryBatchRequest {
+  countryCodes: string[];
+}
+
+export interface GetHumanitarianSummaryBatchResponse {
+  results: Record<string, HumanitarianCountrySummary>;
+  fetched: number;
+  requested: number;
 }
 
 export type UcdpViolenceType = "UCDP_VIOLENCE_TYPE_UNSPECIFIED" | "UCDP_VIOLENCE_TYPE_STATE_BASED" | "UCDP_VIOLENCE_TYPE_NON_STATE" | "UCDP_VIOLENCE_TYPE_ONE_SIDED";
@@ -211,9 +222,9 @@ export class ConflictServiceClient {
   }
 
   async getHumanitarianSummary(req: GetHumanitarianSummaryRequest, options?: ConflictServiceCallOptions): Promise<GetHumanitarianSummaryResponse> {
-    const path = "/api/conflict/v1/get-humanitarian-summary";
+    let path = "/api/conflict/v1/get-humanitarian-summary";
     const params = new URLSearchParams();
-    if (req.countryCode != null && req.countryCode !== "") params.set("country_code", req.countryCode);
+    if (req.countryCode != null && req.countryCode !== "") params.set("country_code", String(req.countryCode));
     const url = this.baseURL + path + (params.toString() ? "?" + params.toString() : "");
 
     const headers: Record<string, string> = {
@@ -236,7 +247,7 @@ export class ConflictServiceClient {
   }
 
   async listIranEvents(_req: ListIranEventsRequest, options?: ConflictServiceCallOptions): Promise<ListIranEventsResponse> {
-    const path = "/api/conflict/v1/list-iran-events";
+    let path = "/api/conflict/v1/list-iran-events";
     const url = this.baseURL + path;
 
     const headers: Record<string, string> = {
@@ -256,6 +267,30 @@ export class ConflictServiceClient {
     }
 
     return await resp.json() as ListIranEventsResponse;
+  }
+
+  async getHumanitarianSummaryBatch(req: GetHumanitarianSummaryBatchRequest, options?: ConflictServiceCallOptions): Promise<GetHumanitarianSummaryBatchResponse> {
+    let path = "/api/conflict/v1/get-humanitarian-summary-batch";
+    const url = this.baseURL + path;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...this.defaultHeaders,
+      ...options?.headers,
+    };
+
+    const resp = await this.fetchFn(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(req),
+      signal: options?.signal,
+    });
+
+    if (!resp.ok) {
+      return this.handleError(resp);
+    }
+
+    return await resp.json() as GetHumanitarianSummaryBatchResponse;
   }
 
   private async handleError(resp: Response): Promise<never> {

@@ -21,6 +21,9 @@ export const DEFAULT_PANELS: Record<string, PanelConfig> = {
 // Map layers — all geopolitical overlays disabled; natural events only
 export const DEFAULT_MAP_LAYERS: MapLayers = {
   gpsJamming: false,
+  satellites: false,
+
+
   conflicts: false,
   bases: false,
   cables: false,
@@ -31,6 +34,8 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   irradiators: false,
   sanctions: false,
   weather: false,
+  canadaRoads: false,
+  canadaAlerts: false,
   economic: false,
   waterways: false,
   outages: false,
@@ -67,12 +72,23 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   renewableInstallations: true,
   tradeRoutes: false,
   iranAttacks: false,
+  ciiChoropleth: false,
+  resilienceScore: false,
   dayNight: false,
+  // Commodity variant layers (disabled in happy variant)
+  miningSites: false,
+  processingPlants: false,
+  commodityPorts: false,
+  webcams: false,
+  diseaseOutbreaks: false,
 };
 
 // Mobile defaults — same as desktop for happy variant
 export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   gpsJamming: false,
+  satellites: false,
+
+
   conflicts: false,
   bases: false,
   cables: false,
@@ -83,6 +99,8 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   irradiators: false,
   sanctions: false,
   weather: false,
+  canadaRoads: false,
+  canadaAlerts: false,
   economic: false,
   waterways: false,
   outages: false,
@@ -119,7 +137,15 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   renewableInstallations: true,
   tradeRoutes: false,
   iranAttacks: false,
+  ciiChoropleth: false,
+  resilienceScore: false,
   dayNight: false,
+  // Commodity variant layers (disabled in happy variant)
+  miningSites: false,
+  processingPlants: false,
+  commodityPorts: false,
+  webcams: false,
+  diseaseOutbreaks: false,
 };
 
 export const VARIANT_CONFIG: VariantConfig = {

@@ -11,6 +11,8 @@ export interface ListPredictionMarketsRequest {
 export interface ListPredictionMarketsResponse {
   markets: PredictionMarket[];
   pagination?: PaginationResponse;
+  fetchedAt: number;
+  dataAvailable: boolean;
 }
 
 export interface PredictionMarket {
@@ -21,12 +23,15 @@ export interface PredictionMarket {
   url: string;
   closesAt: number;
   category: string;
+  source: MarketSource;
 }
 
 export interface PaginationResponse {
   nextCursor: string;
   totalCount: number;
 }
+
+export type MarketSource = "MARKET_SOURCE_UNSPECIFIED" | "MARKET_SOURCE_POLYMARKET" | "MARKET_SOURCE_KALSHI";
 
 export interface FieldViolation {
   field: string;

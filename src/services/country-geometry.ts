@@ -1,4 +1,5 @@
 import type { FeatureCollection, Geometry, GeoJsonProperties, Position } from 'geojson';
+import { markLcpDebug } from '@/utils/lcp-debug';
 
 interface IndexedCountryGeometry {
   code: string;
@@ -13,6 +14,14 @@ interface CountryHit {
 }
 
 const COUNTRY_GEOJSON_URL = '/data/countries.geojson';
+/** The base GeoJSON is the module-level gate for every geometry consumer;
+ * a hung fetch parks `loadPromise` forever, so bound it well above a normal
+ * static-asset load but well below "stuck for the session". */
+const COUNTRY_GEOJSON_TIMEOUT_MS = 15_000;
+
+/** Optional higher-resolution boundary overrides sourced from Natural Earth (served from R2 CDN). */
+const COUNTRY_OVERRIDES_URL = 'https://maps.worldmonitor.app/country-boundary-overrides.geojson';
+const COUNTRY_OVERRIDE_TIMEOUT_MS = 3_000;
 
 const POLITICAL_OVERRIDES: Record<string, string> = { 'CN-TW': 'TW' };
 
@@ -166,6 +175,78 @@ function buildCountryNameMatchers(): void {
     }));
 }
 
+function makeTimeout(ms: number): AbortSignal {
+  if (typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(ms);
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(), ms);
+  return ctrl.signal;
+}
+
+function rebuildCountryIndex(data: FeatureCollection<Geometry>): void {
+  countryIndex.clear();
+  countryList = [];
+  iso3ToIso2.clear();
+  nameToIso2.clear();
+  codeToName.clear();
+
+  for (const feature of data.features) {
+    const code = normalizeCode(feature.properties);
+    const name = normalizeName(feature.properties);
+    if (!code || !name) continue;
+
+    const iso3 = feature.properties?.['ISO3166-1-Alpha-3'];
+    if (typeof iso3 === 'string' && /^[A-Z]{3}$/i.test(iso3.trim())) {
+      iso3ToIso2.set(iso3.trim().toUpperCase(), code);
+    }
+    nameToIso2.set(name.toLowerCase(), code);
+    if (!codeToName.has(code)) codeToName.set(code, name);
+
+    const polygons = normalizeGeometry(feature.geometry);
+    const bbox = computeBbox(polygons);
+    if (!bbox || polygons.length === 0) continue;
+
+    const indexed: IndexedCountryGeometry = { code, name, polygons, bbox };
+    countryIndex.set(code, indexed);
+    countryList.push(indexed);
+  }
+
+  for (const [alias, code] of Object.entries(NAME_ALIASES)) {
+    if (!nameToIso2.has(alias)) {
+      nameToIso2.set(alias, code);
+    }
+  }
+
+  buildCountryNameMatchers();
+}
+
+function applyCountryGeometryOverrides(
+  data: FeatureCollection<Geometry>,
+  overrideData: FeatureCollection<Geometry>,
+): void {
+  const featureByCode = new Map<string, (typeof data.features)[number]>();
+  for (const feature of data.features) {
+    const code = normalizeCode(feature.properties);
+    if (code) featureByCode.set(code, feature);
+  }
+
+  for (const overrideFeature of overrideData.features) {
+    const code = normalizeCode(overrideFeature.properties);
+    if (!code || !overrideFeature.geometry) continue;
+    const mainFeature = featureByCode.get(code);
+    if (!mainFeature) continue;
+
+    mainFeature.geometry = overrideFeature.geometry;
+    const polygons = normalizeGeometry(overrideFeature.geometry);
+    const bbox = computeBbox(polygons);
+    if (!bbox || polygons.length === 0) continue;
+
+    const existing = countryIndex.get(code);
+    if (!existing) continue;
+    existing.polygons = polygons;
+    existing.bbox = bbox;
+  }
+}
+
 async function ensureLoaded(): Promise<void> {
   if (loadedGeoJson || loadPromise) {
     await loadPromise;
@@ -175,8 +256,16 @@ async function ensureLoaded(): Promise<void> {
   loadPromise = (async () => {
     if (typeof fetch !== 'function') return;
 
+    markLcpDebug('wm:data:country-geometry-fetch-start');
     try {
-      const response = await fetch(COUNTRY_GEOJSON_URL);
+      // Bound the fetch: `loadPromise` is cached at module scope, so an
+      // unbounded await parks every future ensureLoaded() caller forever —
+      // the map never renders country boundaries and coordinate lookups
+      // silently degrade. The override fetch below already carries a signal;
+      // this is the same treatment for the primary asset.
+      const response = await fetch(COUNTRY_GEOJSON_URL, {
+        signal: makeTimeout(COUNTRY_GEOJSON_TIMEOUT_MS),
+      });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -187,41 +276,25 @@ async function ensureLoaded(): Promise<void> {
       }
 
       loadedGeoJson = data;
-      countryIndex.clear();
-      countryList = [];
-      iso3ToIso2.clear();
-      nameToIso2.clear();
-      codeToName.clear();
+      rebuildCountryIndex(data);
+      markLcpDebug('wm:data:country-geometry-fetch-ready', { features: data.features.length });
 
-      for (const feature of data.features) {
-        const code = normalizeCode(feature.properties);
-        const name = normalizeName(feature.properties);
-        if (!code || !name) continue;
-
-        const iso3 = feature.properties?.['ISO3166-1-Alpha-3'];
-        if (typeof iso3 === 'string' && /^[A-Z]{3}$/i.test(iso3.trim())) {
-          iso3ToIso2.set(iso3.trim().toUpperCase(), code);
+      // Apply optional higher-resolution boundary overrides (sourced from Natural Earth)
+      try {
+        const overrideResp = await fetch(COUNTRY_OVERRIDES_URL, {
+          signal: makeTimeout(COUNTRY_OVERRIDE_TIMEOUT_MS),
+        });
+        if (overrideResp.ok) {
+          const overrideData = (await overrideResp.json()) as FeatureCollection<Geometry>;
+          if (overrideData?.type === 'FeatureCollection' && Array.isArray(overrideData.features)) {
+            applyCountryGeometryOverrides(data, overrideData);
+          }
         }
-        nameToIso2.set(name.toLowerCase(), code);
-        if (!codeToName.has(code)) codeToName.set(code, name);
-
-        const polygons = normalizeGeometry(feature.geometry);
-        const bbox = computeBbox(polygons);
-        if (!bbox || polygons.length === 0) continue;
-
-        const indexed: IndexedCountryGeometry = { code, name, polygons, bbox };
-        countryIndex.set(code, indexed);
-        countryList.push(indexed);
+      } catch {
+        // Overrides optional; ignore fetch/parse errors
       }
-
-      for (const [alias, code] of Object.entries(NAME_ALIASES)) {
-        if (!nameToIso2.has(alias)) {
-          nameToIso2.set(alias, code);
-        }
-      }
-
-      buildCountryNameMatchers();
     } catch (err) {
+      markLcpDebug('wm:data:country-geometry-fetch-error');
       console.warn('[country-geometry] Failed to load countries.geojson:', err);
     }
   })();
@@ -231,6 +304,16 @@ async function ensureLoaded(): Promise<void> {
 
 export async function preloadCountryGeometry(): Promise<void> {
   await ensureLoaded();
+}
+
+/**
+ * True once the base country GeoJSON has been parsed and indexed, i.e. when
+ * getCountryAtCoordinates can resolve precise hits. Used by the boot path to
+ * decide whether geometry-dependent CII attribution actually ran without
+ * precision geometry (and therefore needs a replay) — see #4512.
+ */
+export function isCountryGeometryLoaded(): boolean {
+  return loadedGeoJson !== null;
 }
 
 export async function getCountriesGeoJson(): Promise<FeatureCollection<Geometry> | null> {
@@ -300,6 +383,22 @@ export function getAllCountryCodes(): string[] {
 export function getCountryBbox(code: string): [number, number, number, number] | null {
   const entry = countryIndex.get(code.toUpperCase());
   return entry?.bbox ?? null;
+}
+
+export function getCountryCentroid(
+  code: string,
+  fallbackBounds?: Record<string, { n: number; s: number; e: number; w: number }>,
+): { lat: number; lon: number } | null {
+  const bbox = getCountryBbox(code);
+  if (bbox) {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    return { lat: (minLat + maxLat) / 2, lon: (minLon + maxLon) / 2 };
+  }
+  const fb = fallbackBounds?.[code];
+  if (fb) {
+    return { lat: (fb.n + fb.s) / 2, lon: (fb.e + fb.w) / 2 };
+  }
+  return null;
 }
 
 export const ME_STRIKE_BOUNDS: Record<string, { n: number; s: number; e: number; w: number }> = {

@@ -1,4 +1,6 @@
 import { Panel } from './Panel';
+import { t, getLocale } from '@/services/i18n';
+import { unsafeRawHtml } from '@/utils/sanitize';
 
 interface CityEntry {
   id: string;
@@ -7,6 +9,31 @@ interface CityEntry {
   timezone: string;
   marketOpen?: number;
   marketClose?: number;
+}
+
+/**
+ * Cached per-row element handles plus the last value written to each, so the
+ * 1 Hz tick can patch text/class/style in place instead of rebuilding markup.
+ *
+ * Only `time` changes every second. The bar width moves ~every 86 s (0.1% of a
+ * day), the timezone label daily, and day/night and market status a couple of
+ * times a day — so a value-diff on each keeps the steady-state tick down to one
+ * `textContent` write per city.
+ */
+interface ClockRefs {
+  city: CityEntry;
+  row: HTMLElement;
+  time: HTMLElement;
+  bar: HTMLElement;
+  tz: HTMLElement;
+  status: HTMLElement | null;
+  last: {
+    time: string;
+    barWidth: string;
+    tz: string;
+    isDay: boolean | null;
+    isOpen: boolean | null;
+  };
 }
 
 const WORLD_CITIES: CityEntry[] = [
@@ -92,31 +119,39 @@ function saveSelectedCities(ids: string[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
 }
 
-function getTimeInZone(tz: string): { h: number; m: number; s: number; dayOfWeek: string } {
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz, hour: 'numeric', minute: 'numeric', second: 'numeric',
-    hour12: false, weekday: 'short',
-  }).formatToParts(now);
-  let h = 0, m = 0, s = 0, dayOfWeek = '';
-  for (const p of parts) {
-    if (p.type === 'hour') h = parseInt(p.value, 10);
-    if (p.type === 'minute') m = parseInt(p.value, 10);
-    if (p.type === 'second') s = parseInt(p.value, 10);
-    if (p.type === 'weekday') dayOfWeek = p.value;
-  }
-  if (h === 24) h = 0;
-  return { h, m, s, dayOfWeek };
-}
-
-function getTzAbbr(tz: string): string {
+/**
+ * Local wall-clock parts for a zone, INCLUDING its short abbreviation.
+ *
+ * The abbreviation comes from this same `formatToParts` call rather than a
+ * second formatter, so it always describes the instant being displayed. Any
+ * scheme that caches it against a time-derived key is a heuristic that breaks at
+ * a DST fall-back, where the same weekday/hour/minute occurs twice under
+ * different zones (America/New_York 2026-11-01 01:30 is both EDT and EST).
+ * Reading it from the authoritative call is both cheaper — one formatter per
+ * city per tick instead of two — and correct by construction.
+ */
+function getTimeInZone(tz: string): {
+  h: number; m: number; s: number; dayOfWeek: string; abbr: string;
+} {
   try {
-    const fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' });
-    const parts = fmt.formatToParts(new Date());
-    const tzPart = parts.find(p => p.type === 'timeZoneName');
-    return tzPart?.value ?? '';
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat(getLocale(), {
+      timeZone: tz, hour: 'numeric', minute: 'numeric', second: 'numeric',
+      hour12: false, weekday: 'short', timeZoneName: 'short',
+      numberingSystem: 'latn',
+    }).formatToParts(now);
+    let h = 0, m = 0, s = 0, dayOfWeek = '', abbr = '';
+    for (const p of parts) {
+      if (p.type === 'hour') h = parseInt(p.value, 10);
+      if (p.type === 'minute') m = parseInt(p.value, 10);
+      if (p.type === 'second') s = parseInt(p.value, 10);
+      if (p.type === 'weekday') dayOfWeek = p.value;
+      if (p.type === 'timeZoneName') abbr = p.value;
+    }
+    if (h === 24) h = 0;
+    return { h, m, s, dayOfWeek, abbr };
   } catch {
-    return '';
+    return { h: 0, m: 0, s: 0, dayOfWeek: '', abbr: '' };
   }
 }
 
@@ -124,52 +159,7 @@ function pad2(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
 }
 
-const STYLE = `<style>
-.wc-container{display:flex;flex-direction:column}
-.wc-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border-subtle,#1a1a1a);transition:background .15s;gap:0}
-.wc-row:last-child{border-bottom:none}
-.wc-row:hover{background:var(--surface-hover,#1e1e1e)}
-.wc-row.wc-home{border-left:2px solid #44ff88;padding-left:8px;background:rgba(68,255,136,.03)}
-.wc-row.wc-night .wc-time{opacity:.65}
-.wc-info{display:flex;flex-direction:column;gap:3px;min-width:0}
-.wc-name{font-size:12px;font-weight:700;color:var(--text,#e8e8e8);letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wc-home-tag{font-size:9px;color:#44ff88;margin-left:4px;font-weight:400;opacity:.7}
-.wc-detail{display:flex;align-items:center;gap:6px}
-.wc-exchange{font-size:10px;color:var(--text-dim,#888);letter-spacing:.5px;text-transform:uppercase}
-.wc-status{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:600;letter-spacing:.5px}
-.wc-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
-.wc-dot.open{background:#44ff88;box-shadow:0 0 6px rgba(68,255,136,.6);animation:wc-pulse 2s ease-in-out infinite}
-.wc-dot.closed{background:var(--text-muted,#666)}
-.wc-status.open{color:#44ff88}
-.wc-status.closed{color:var(--text-muted,#666)}
-.wc-clock{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0}
-.wc-time{font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--text,#e8e8e8);letter-spacing:1.5px;line-height:1;font-variant-numeric:tabular-nums}
-.wc-tz{font-size:9px;color:var(--text-dim,#888);display:flex;align-items:center;gap:6px}
-.wc-bar-wrap{width:36px;height:3px;background:var(--border,#2a2a2a);border-radius:2px;overflow:hidden}
-.wc-bar{height:100%;border-radius:2px;transition:width 1s linear}
-.wc-bar.day{background:linear-gradient(90deg,#44ff88,#88ff44)}
-.wc-bar.night{background:linear-gradient(90deg,#445,#556)}
-@keyframes wc-pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.wc-settings-btn{background:none;border:1px solid transparent;color:var(--text-dim,#888);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all .15s;line-height:1}
-.wc-settings-btn:hover{background:var(--overlay-light,rgba(255,255,255,.05));color:var(--text,#e8e8e8);border-color:var(--border,#2a2a2a)}
-.wc-settings-btn.wc-active{background:rgba(68,255,136,.1);color:#44ff88;border-color:rgba(68,255,136,.3)}
-.wc-settings-view{padding:2px 0}
-.wc-region-header{font-size:9px;font-weight:600;color:var(--text-dim,#888);text-transform:uppercase;letter-spacing:1px;padding:8px 10px 4px;border-bottom:1px solid var(--border-subtle,#1a1a1a)}
-.wc-region-header:first-child{padding-top:4px}
-.wc-region-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
-.wc-city-option{display:flex;align-items:center;gap:6px;padding:5px 10px;cursor:pointer;transition:background .1s;font-size:11px}
-.wc-city-option:hover{background:var(--surface-hover,#1e1e1e)}
-.wc-city-option input[type=checkbox]{accent-color:#44ff88;width:12px;height:12px;flex-shrink:0;cursor:pointer}
-.wc-opt-name{font-weight:600;color:var(--text,#e8e8e8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wc-opt-label{font-size:9px;color:var(--text-muted,#666);margin-left:auto;flex-shrink:0}
-.wc-empty{padding:20px 10px;text-align:center;color:var(--text-dim,#888);font-size:11px}
-.wc-drag-handle{cursor:grab;color:var(--text-muted,#555);font-size:11px;padding:0 6px 0 2px;user-select:none;opacity:.35;transition:opacity .15s;display:flex;align-items:center}
-.wc-row:hover .wc-drag-handle{opacity:.6}
-.wc-drag-handle:hover{opacity:1!important;color:var(--text,#e8e8e8);cursor:grab}
-.wc-row.wc-dragging{opacity:.3}
-.wc-row.wc-drag-over-above{box-shadow:inset 0 2px 0 #44ff88}
-.wc-row.wc-drag-over-below{box-shadow:inset 0 -2px 0 #44ff88}
-</style>`;
+/* Styles moved to panels.css (PERF-012) */
 
 export class WorldClockPanel extends Panel {
   private tickInterval: ReturnType<typeof setInterval> | null = null;
@@ -180,9 +170,11 @@ export class WorldClockPanel extends Panel {
   private dragging = false;
   private dragCityId: string | null = null;
   private dragStartY = 0;
+  /** Populated once per structural render; empty while the settings view is up. */
+  private clockRefs = new Map<string, ClockRefs>();
 
   constructor() {
-    super({ id: 'world-clock', title: 'World Clock', trackActivity: false });
+    super({ id: 'world-clock', title: 'World Clock', trackActivity: false, infoTooltip: t('components.worldClock.infoTooltip') });
     this.homeCityId = detectHomeCity();
     this.selectedCities = loadSelectedCities();
 
@@ -211,8 +203,12 @@ export class WorldClockPanel extends Panel {
 
     this.setupDragHandlers();
     this.renderClocks();
+    // Patch the live values in place (#4487 INP): rebuilding the whole clock
+    // face once a second replaced every node and forced style+layout+paint on a
+    // 1 s cadence forever, which lands in the input-delay window of any
+    // interaction sharing it. Structure only changes on city add/remove/reorder.
     this.tickInterval = setInterval(() => {
-      if (!this.showingSettings && !this.dragging) this.renderClocks();
+      if (!this.showingSettings && !this.dragging) this.tickClocks();
     }, 1000);
   }
 
@@ -232,7 +228,7 @@ export class WorldClockPanel extends Panel {
   }
 
   private renderSettings(): void {
-    let html = STYLE + '<div class="wc-settings-view">';
+    let html = '<div class="wc-settings-view">';
     for (const region of CITY_REGIONS) {
       html += `<div class="wc-region-header">${region.name}</div><div class="wc-region-grid">`;
       for (const id of region.ids) {
@@ -244,11 +240,43 @@ export class WorldClockPanel extends Panel {
       html += '</div>';
     }
     html += '</div>';
-    this.setContent(html);
+    // The settings view replaces the clock rows outright, so the cached row
+    // handles are about to detach. Drop them; leaving the settings view calls
+    // renderClocks(), which rebinds.
+    this.setSafeContent(
+      unsafeRawHtml(html, 'legacy Panel.setContent() migration'),
+      () => this.clockRefs.clear(),
+    );
   }
 
   private setupDragHandlers(): void {
     const content = this.content;
+
+    // Keyboard parity for the mouse drag below (same idiom as the panel
+    // reorder button from #6964): arrows on a focused handle move the row
+    // one slot and persist through the same saveSelectedCities path.
+    content.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      // A live pointer gesture owns selectedCities until mouseup.
+      if (this.dragCityId) return;
+      const handle = (e.target as HTMLElement).closest('.wc-drag-handle');
+      const row = handle?.closest('.wc-row') as HTMLElement | null;
+      const cityId = row?.dataset.cityId;
+      if (!cityId || !row) return;
+      const fromIdx = this.selectedCities.indexOf(cityId);
+      const toIdx = e.key === 'ArrowUp' ? fromIdx - 1 : fromIdx + 1;
+      if (fromIdx === -1 || toIdx < 0 || toIdx >= this.selectedCities.length) return;
+      const sibling = e.key === 'ArrowUp' ? row.previousElementSibling : row.nextElementSibling;
+      if (!(sibling instanceof HTMLElement) || !sibling.classList.contains('wc-row')) return;
+      e.preventDefault();
+      this.selectedCities.splice(fromIdx, 1);
+      this.selectedCities.splice(toIdx, 0, cityId);
+      saveSelectedCities(this.selectedCities);
+      // Move the live row. renderClocks() is a 150ms setSafeContent rebuild and
+      // would destroy the focused handle before afterUpdate runs.
+      row.parentElement?.insertBefore(row, e.key === 'ArrowUp' ? sibling : sibling.nextElementSibling);
+      if (handle instanceof HTMLElement) handle.focus();
+    });
 
     content.addEventListener('mousedown', (e: MouseEvent) => {
       const handle = (e.target as HTMLElement).closest('.wc-drag-handle') as HTMLElement | null;
@@ -256,10 +284,12 @@ export class WorldClockPanel extends Panel {
       const row = handle.closest('.wc-row') as HTMLElement | null;
       if (!row) return;
       e.preventDefault();
+      e.stopPropagation();
       this.dragCityId = row.dataset.cityId ?? null;
       this.dragStartY = e.clientY;
       this.dragging = false;
       row.classList.add('wc-dragging');
+      content.classList.add('wc-content-dragging');
     });
 
     document.addEventListener('mousemove', (e: MouseEvent) => {
@@ -284,6 +314,7 @@ export class WorldClockPanel extends Panel {
       this.dragCityId = null;
       const rows = content.querySelectorAll('.wc-row[data-city-id]');
       rows.forEach(r => r.classList.remove('wc-dragging', 'wc-drag-over-above', 'wc-drag-over-below'));
+      content.classList.remove('wc-content-dragging');
 
       if (this.dragging) {
         let targetId: string | null = null;
@@ -320,16 +351,18 @@ export class WorldClockPanel extends Panel {
       .filter((c): c is CityEntry => !!c);
 
     if (sorted.length === 0) {
-      this.setContent(STYLE + '<div class="wc-empty">No cities selected. Click \u2699 to add cities.</div>');
+      this.setSafeContent(
+        unsafeRawHtml('<div class="wc-empty">No cities selected. Click \u2699 to add cities.</div>', 'legacy Panel.setContent() migration'),
+        () => this.clockRefs.clear(),
+      );
       return;
     }
 
-    let html = STYLE + '<div class="wc-container">';
+    let html = '<div class="wc-container" translate="no">';
     for (const city of sorted) {
-      const { h, m, s, dayOfWeek } = getTimeInZone(city.timezone);
+      const { h, m, s, dayOfWeek, abbr } = getTimeInZone(city.timezone);
       const isDay = h >= 6 && h < 20;
       const pct = ((h * 3600 + m * 60 + s) / 86400) * 100;
-      const abbr = getTzAbbr(city.timezone);
       const isHome = city.id === this.homeCityId;
       const isWeekday = dayOfWeek !== 'Sat' && dayOfWeek !== 'Sun';
 
@@ -345,10 +378,102 @@ export class WorldClockPanel extends Panel {
       if (isHome) rowCls.push('wc-home');
       if (!isDay) rowCls.push('wc-night');
 
-      html += `<div class="${rowCls.join(' ')}" data-city-id="${city.id}"><div class="wc-drag-handle" title="Drag to reorder">\u22EE</div><div class="wc-info"><div class="wc-name">${city.city}${isHome ? '<span class="wc-home-tag">\u2302</span>' : ''}</div><div class="wc-detail"><span class="wc-exchange">${city.label}</span>${statusHtml}</div></div><div class="wc-clock"><div class="wc-time">${pad2(h)}:${pad2(m)}:${pad2(s)}</div><div class="wc-tz"><div class="wc-bar-wrap"><div class="wc-bar ${isDay ? 'day' : 'night'}" style="width:${pct.toFixed(1)}%"></div></div><span>${dayOfWeek} ${abbr}</span></div></div></div>`;
+      html += `<div class="${rowCls.join(' ')}" data-city-id="${city.id}"><div class="wc-drag-handle" role="button" tabindex="0" title="Drag to reorder" aria-label="Move ${city.city} (arrow keys)">\u22EE</div><div class="wc-info"><div class="wc-name">${city.city}${isHome ? '<span class="wc-home-tag">\u2302</span>' : ''}</div><div class="wc-detail"><span class="wc-exchange">${city.label}</span>${statusHtml}</div></div><div class="wc-clock"><div class="wc-time">${pad2(h)}:${pad2(m)}:${pad2(s)}</div><div class="wc-tz"><div class="wc-bar-wrap"><div class="wc-bar ${isDay ? 'day' : 'night'}" style="width:${pct.toFixed(1)}%"></div></div><span>${dayOfWeek} ${abbr}</span></div></div></div>`;
     }
     html += '</div>';
-    this.setContent(html);
+    // Cache handles only once the debounced write has actually committed —
+    // querying before that would bind to the outgoing subtree.
+    this.setSafeContent(
+      unsafeRawHtml(html, 'legacy Panel.setContent() migration'),
+      () => this.cacheClockRefs(sorted),
+    );
+  }
+
+  /** Bind one `ClockRefs` per rendered row. Silently skips rows that are absent. */
+  private cacheClockRefs(cities: CityEntry[]): void {
+    this.clockRefs.clear();
+    const container = this.content.querySelector<HTMLElement>('.wc-container');
+    if (!container) return;
+
+    for (const city of cities) {
+      const row = container.querySelector<HTMLElement>(`.wc-row[data-city-id="${city.id}"]`);
+      if (!row) continue;
+      const time = row.querySelector<HTMLElement>('.wc-time');
+      const bar = row.querySelector<HTMLElement>('.wc-bar');
+      const tz = row.querySelector<HTMLElement>('.wc-tz > span');
+      if (!time || !bar || !tz) continue;
+
+      this.clockRefs.set(city.id, {
+        city,
+        row,
+        time,
+        bar,
+        tz,
+        status: row.querySelector<HTMLElement>('.wc-status'),
+        last: {
+          time: time.textContent ?? '',
+          barWidth: bar.style.width,
+          tz: tz.textContent ?? '',
+          isDay: null,
+          isOpen: null,
+        },
+      });
+    }
+  }
+
+  /**
+   * One second of work: recompute each city's clock and write back only the
+   * values that actually changed. No node is created, removed or replaced.
+   */
+  private tickClocks(): void {
+    for (const refs of this.clockRefs.values()) {
+      const { city, last } = refs;
+      const { h, m, s, dayOfWeek, abbr } = getTimeInZone(city.timezone);
+
+      const time = `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+      if (last.time !== time) {
+        refs.time.textContent = time;
+        last.time = time;
+      }
+
+      const barWidth = `${(((h * 3600 + m * 60 + s) / 86400) * 100).toFixed(1)}%`;
+      if (last.barWidth !== barWidth) {
+        refs.bar.style.width = barWidth;
+        last.barWidth = barWidth;
+      }
+
+      const isDay = h >= 6 && h < 20;
+      if (last.isDay !== isDay) {
+        refs.row.classList.toggle('wc-night', !isDay);
+        refs.bar.classList.toggle('day', isDay);
+        refs.bar.classList.toggle('night', !isDay);
+        last.isDay = isDay;
+      }
+
+      const tz = `${dayOfWeek} ${abbr}`;
+      if (last.tz !== tz) {
+        refs.tz.textContent = tz;
+        last.tz = tz;
+      }
+
+      if (refs.status && city.marketOpen !== undefined && city.marketClose !== undefined) {
+        const isOpen = dayOfWeek !== 'Sat' && dayOfWeek !== 'Sun'
+          && h >= city.marketOpen && h < city.marketClose;
+        if (last.isOpen !== isOpen) {
+          const state = isOpen ? 'open' : 'closed';
+          refs.status.className = `wc-status ${state}`;
+          const dot = refs.status.firstElementChild;
+          if (dot) dot.className = `wc-dot ${state}`;
+          // The label is a bare text node after the dot; replace its value so
+          // the dot element survives (setting textContent would delete it).
+          const label = refs.status.lastChild;
+          if (label && label.nodeType === Node.TEXT_NODE) {
+            label.nodeValue = isOpen ? 'OPEN' : 'CLSD';
+          }
+          last.isOpen = isOpen;
+        }
+      }
+    }
   }
 
   destroy(): void {
@@ -356,6 +481,7 @@ export class WorldClockPanel extends Panel {
       clearInterval(this.tickInterval);
       this.tickInterval = null;
     }
+    this.clockRefs.clear();
     super.destroy();
   }
 }

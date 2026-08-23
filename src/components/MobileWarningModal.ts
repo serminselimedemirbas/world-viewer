@@ -1,15 +1,22 @@
 import { t } from '@/services/i18n';
 import { isMobileDevice } from '@/utils';
+import { getDismissed, setDismissed } from '@/utils/cross-domain-storage';
+import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
+import { createFocusTrap, type FocusTrap } from '@/utils/focus-trap';
+
 
 const STORAGE_KEY = 'mobile-warning-dismissed';
 
 export class MobileWarningModal {
   private element: HTMLElement;
+  private focusTrap: FocusTrap | null = null;
 
   constructor() {
     this.element = document.createElement('div');
     this.element.className = 'mobile-warning-overlay';
-    this.element.innerHTML = `
+    this.element.setAttribute('role', 'dialog');
+    this.element.setAttribute('aria-modal', 'true');
+    setTrustedHtml(this.element, trustedHtml(`
       <div class="mobile-warning-modal">
         <div class="mobile-warning-header">
           <span class="mobile-warning-icon">📱</span>
@@ -27,7 +34,7 @@ export class MobileWarningModal {
           <button class="mobile-warning-btn">${t('modals.mobileWarning.gotIt')}</button>
         </div>
       </div>
-    `;
+    `, "legacy direct innerHTML migration"));
 
     document.body.appendChild(this.element);
     this.setupEventListeners();
@@ -54,21 +61,24 @@ export class MobileWarningModal {
   private dismiss(): void {
     const checkbox = this.element.querySelector('#mobileWarningRemember') as HTMLInputElement;
     if (checkbox?.checked) {
-      localStorage.setItem(STORAGE_KEY, 'true');
+      setDismissed(STORAGE_KEY);
     }
     this.hide();
   }
 
   public show(): void {
     this.element.classList.add('active');
+    this.focusTrap ??= createFocusTrap(this.element, { onEscape: () => this.dismiss() });
+    this.focusTrap.activate();
   }
 
   public hide(): void {
     this.element.classList.remove('active');
+    this.focusTrap?.deactivate();
   }
 
   public static shouldShow(): boolean {
-    if (localStorage.getItem(STORAGE_KEY) === 'true') return false;
+    if (getDismissed(STORAGE_KEY)) return false;
     return isMobileDevice();
   }
 

@@ -1,8 +1,5 @@
-import {
-  CyberServiceClient,
-  type CyberThreat as ProtoCyberThreat,
-  type ListCyberThreatsResponse,
-} from '@/generated/client/worldmonitor/cyber/v1/service_client';
+import { getRpcBaseUrl } from '@/services/rpc-client';
+import type { CyberThreat as ProtoCyberThreat, ListCyberThreatsResponse } from '@/generated/client/worldmonitor/cyber/v1/service_client';
 import type {
   CyberThreat,
   CyberThreatType,
@@ -11,10 +8,12 @@ import type {
   CyberThreatIndicatorType,
 } from '@/types';
 import { createCircuitBreaker } from '@/utils';
+import { ensureHydrated } from '@/services/bootstrap';
+import { CyberServiceClient } from '@/services/generated-rpc-clients';
 
 // ---- Client + Circuit Breaker ----
 
-const client = new CyberServiceClient('', { fetch: (...args) => globalThis.fetch(...args) });
+const client = new CyberServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
 const breaker = createCircuitBreaker<ListCyberThreatsResponse>({ name: 'Cyber Threats', cacheTtlMs: 10 * 60 * 1000, persistCache: true });
 
 const emptyFallback: ListCyberThreatsResponse = { threats: [], pagination: undefined };
@@ -82,6 +81,15 @@ function clampInt(rawValue: number | undefined, fallback: number, min: number, m
 }
 
 export async function fetchCyberThreats(options: { limit?: number; days?: number } = {}): Promise<CyberThreat[]> {
+  // `cyberThreats` is an on-demand bootstrap key (#5300): it no longer rides in
+  // the slow tier, because loadCyberThreats is gated on the cyber layer being ON
+  // and that layer is off by default in every variant — so the tier was shipping
+  // 364 KB to every visitor for data the default visitor never read. Callers that
+  // reach here have already passed that gate, so fetch it now, through its own
+  // CDN-shielded per-key URL. Falls through to the RPC below if that fetch fails.
+  const hydrated = (await ensureHydrated('cyberThreats')) as { threats?: ProtoCyberThreat[] } | undefined;
+  if (hydrated?.threats?.length) return hydrated.threats.map(toCyberThreat);
+
   const limit = clampInt(options.limit, DEFAULT_LIMIT, 1, MAX_LIMIT);
   const days = clampInt(options.days, DEFAULT_DAYS, 1, MAX_DAYS);
   const now = Date.now();

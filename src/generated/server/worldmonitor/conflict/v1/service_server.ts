@@ -83,7 +83,13 @@ export interface HumanitarianCountrySummary {
   updatedAt: number;
 }
 
-export interface ListIranEventsRequest {}
+export interface ListIranEventsRequest {
+}
+
+export interface ListIranEventsResponse {
+  events: IranEvent[];
+  scrapedAt: string;
+}
 
 export interface IranEvent {
   id: string;
@@ -93,13 +99,18 @@ export interface IranEvent {
   latitude: number;
   longitude: number;
   locationName: string;
-  timestamp: number;
+  timestamp: string;
   severity: string;
 }
 
-export interface ListIranEventsResponse {
-  events: IranEvent[];
-  scrapedAt: number;
+export interface GetHumanitarianSummaryBatchRequest {
+  countryCodes: string[];
+}
+
+export interface GetHumanitarianSummaryBatchResponse {
+  results: Record<string, HumanitarianCountrySummary>;
+  fetched: number;
+  requested: number;
 }
 
 export type UcdpViolenceType = "UCDP_VIOLENCE_TYPE_UNSPECIFIED" | "UCDP_VIOLENCE_TYPE_STATE_BASED" | "UCDP_VIOLENCE_TYPE_NON_STATE" | "UCDP_VIOLENCE_TYPE_ONE_SIDED";
@@ -153,6 +164,7 @@ export interface ConflictServiceHandler {
   listUcdpEvents(ctx: ServerContext, req: ListUcdpEventsRequest): Promise<ListUcdpEventsResponse>;
   getHumanitarianSummary(ctx: ServerContext, req: GetHumanitarianSummaryRequest): Promise<GetHumanitarianSummaryResponse>;
   listIranEvents(ctx: ServerContext, req: ListIranEventsRequest): Promise<ListIranEventsResponse>;
+  getHumanitarianSummaryBatch(ctx: ServerContext, req: GetHumanitarianSummaryBatchRequest): Promise<GetHumanitarianSummaryBatchResponse>;
 }
 
 export function createConflictServiceRoutes(
@@ -269,11 +281,16 @@ export function createConflictServiceRoutes(
         try {
           const pathParams: Record<string, string> = {};
           const url = new URL(req.url, "http://localhost");
-
           const params = url.searchParams;
           const body: GetHumanitarianSummaryRequest = {
             countryCode: params.get("country_code") ?? "",
           };
+          if (options?.validateRequest) {
+            const bodyViolations = options.validateRequest("getHumanitarianSummary", body);
+            if (bodyViolations) {
+              throw new ValidationError(bodyViolations);
+            }
+          }
 
           const ctx: ServerContext = {
             request: req,
@@ -310,7 +327,7 @@ export function createConflictServiceRoutes(
       handler: async (req: Request): Promise<Response> => {
         try {
           const pathParams: Record<string, string> = {};
-          const body: ListIranEventsRequest = {};
+          const body = {} as ListIranEventsRequest;
 
           const ctx: ServerContext = {
             request: req,
@@ -320,6 +337,49 @@ export function createConflictServiceRoutes(
 
           const result = await handler.listIranEvents(ctx, body);
           return new Response(JSON.stringify(result as ListIranEventsResponse), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (err: unknown) {
+          if (err instanceof ValidationError) {
+            return new Response(JSON.stringify({ violations: err.violations }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          if (options?.onError) {
+            return options.onError(err, req);
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          return new Response(JSON.stringify({ message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      },
+    },
+    {
+      method: "POST",
+      path: "/api/conflict/v1/get-humanitarian-summary-batch",
+      handler: async (req: Request): Promise<Response> => {
+        try {
+          const pathParams: Record<string, string> = {};
+          const body = await req.json() as GetHumanitarianSummaryBatchRequest;
+          if (options?.validateRequest) {
+            const bodyViolations = options.validateRequest("getHumanitarianSummaryBatch", body);
+            if (bodyViolations) {
+              throw new ValidationError(bodyViolations);
+            }
+          }
+
+          const ctx: ServerContext = {
+            request: req,
+            pathParams,
+            headers: Object.fromEntries(req.headers.entries()),
+          };
+
+          const result = await handler.getHumanitarianSummaryBatch(ctx, body);
+          return new Response(JSON.stringify(result as GetHumanitarianSummaryBatchResponse), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });

@@ -1,9 +1,11 @@
 import { Panel } from './Panel';
-import { escapeHtml } from '@/utils/sanitize';
+import { createLazyClient, getRpcBaseUrl, rpcFetch } from '@/services/rpc-client';
+import { escapeHtml, unsafeRawHtml } from '@/utils/sanitize';
 import { t } from '@/services/i18n';
-import { EconomicServiceClient } from '@/generated/client/worldmonitor/economic/v1/service_client';
+
 import type { GetMacroSignalsResponse } from '@/generated/client/worldmonitor/economic/v1/service_client';
 import { getHydratedData } from '@/services/bootstrap';
+import { EconomicServiceClient } from '@/services/generated-rpc-clients';
 
 interface MacroSignalData {
   timestamp: string;
@@ -23,7 +25,7 @@ interface MacroSignalData {
   unavailable?: boolean;
 }
 
-const economicClient = new EconomicServiceClient('', { fetch: (...args) => globalThis.fetch(...args) });
+const getEconomicClient = createLazyClient(() => new EconomicServiceClient(getRpcBaseUrl(), { fetch: rpcFetch }));
 
 /** Map proto response (optional fields = undefined) to MacroSignalData (null for absent values). */
 function mapProtoToData(r: GetMacroSignalsResponse): MacroSignalData {
@@ -86,7 +88,7 @@ function sparklineSvg(data: number[], width = 80, height = 24, color = '#4fc3f7'
     const y = height - ((v - min) / range) * (height - 2) - 1;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
-  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="signal-sparkline"><polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="signal-sparkline" aria-hidden="true"><polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 
 function donutGaugeSvg(value: number | null, size = 48): string {
@@ -99,11 +101,18 @@ function donutGaugeSvg(value: number | null, size = 48): string {
   if (v >= 75) color = '#4caf50';
   else if (v >= 50) color = '#ff9800';
   else if (v >= 25) color = '#ff5722';
-  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="fg-donut">
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="fg-donut" role="img" aria-label="Fear and greed index: ${v}">
     <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="5"/>
     <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="5" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-linecap="round" transform="rotate(-90 ${size / 2} ${size / 2})"/>
-    <text x="${size / 2}" y="${size / 2 + 4}" text-anchor="middle" fill="${color}" font-size="12" font-weight="bold">${v}</text>
+    <text x="${size / 2}" y="${size / 2 + 4}" text-anchor="middle" fill="${color}" style="font-size:calc(12px * var(--wm-panel-effective-scale, 1))" font-weight="bold">${v}</text>
   </svg>`;
+}
+
+function fgSparklineColor(status: string): string {
+  const s = status.toUpperCase();
+  if (['GREED', 'EXTREME GREED'].includes(s)) return '#4caf50';
+  if (['FEAR', 'EXTREME FEAR'].includes(s)) return '#f44336';
+  return '#4fc3f7';
 }
 
 function statusBadgeClass(status: string): string {
@@ -126,46 +135,41 @@ export class MacroSignalsPanel extends Panel {
   private lastTimestamp = '';
 
   constructor() {
-    super({ id: 'macro-signals', title: t('panels.macroSignals'), showCount: false });
-    void this.fetchData();
+    super({ id: 'macro-signals', title: t('panels.macroSignals'), showCount: false, infoTooltip: t('components.macroSignals.infoTooltip') });
   }
 
   public async fetchData(): Promise<boolean> {
     const hydrated = getHydratedData('macroSignals') as GetMacroSignalsResponse | undefined;
-    if (hydrated) {
+    if (hydrated?.signals && hydrated.totalCount > 0) {
       this.data = mapProtoToData(hydrated);
       this.lastTimestamp = this.data.timestamp;
       this.error = null;
       this.loading = false;
       this.renderPanel();
+      void this.refreshFromRpc();
       return true;
     }
+    return this.refreshFromRpc();
+  }
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const res = await economicClient.getMacroSignals({});
-        this.data = mapProtoToData(res);
-        this.error = null;
-
-        if (this.data && this.data.unavailable && attempt < 2) {
-          this.showRetrying();
-          await new Promise(r => setTimeout(r, 20_000));
-          continue;
-        }
-        break;
-      } catch (err) {
-        if (this.isAbortError(err)) return false;
-        if (attempt < 2) {
-          this.showRetrying();
-          await new Promise(r => setTimeout(r, 20_000));
-          continue;
-        }
-        this.error = err instanceof Error ? err.message : 'Failed to fetch';
+  private async refreshFromRpc(): Promise<boolean> {
+    try {
+      const res = await getEconomicClient().getMacroSignals({});
+      if (!this.element?.isConnected) return false;
+      this.data = mapProtoToData(res);
+      this.error = null;
+    } catch (err) {
+      if (this.isAbortError(err)) return false;
+      if (!this.element?.isConnected) return false;
+      if (!this.data) {
+        console.warn('[MacroSignals] Fetch error:', err);
+        this.error = t('common.noDataShort');
+      } else {
+        return false;
       }
     }
     this.loading = false;
     this.renderPanel();
-
     const ts = this.data?.timestamp ?? '';
     const changed = ts !== this.lastTimestamp;
     this.lastTimestamp = ts;
@@ -179,12 +183,12 @@ export class MacroSignalsPanel extends Panel {
     }
 
     if (this.error || !this.data) {
-      this.showError(this.error || t('common.noDataShort'));
+      this.showError(this.error || t('common.noDataShort'), () => void this.fetchData());
       return;
     }
 
     if (this.data.unavailable) {
-      this.showError(t('common.upstreamUnavailable'));
+      this.showError(t('common.upstreamUnavailable'), () => void this.fetchData());
       return;
     }
 
@@ -197,6 +201,7 @@ export class MacroSignalsPanel extends Panel {
       <div class="macro-signals-container">
         <div class="macro-verdict ${verdictClass}">
           <span class="verdict-label">${t('components.macroSignals.overall')}</span>
+          <span style="font-size:calc(9px * var(--wm-panel-effective-scale, 1));background:rgba(247,147,26,0.15);color:#f7931a;border:1px solid rgba(247,147,26,0.3);padding:1px 5px;border-radius:3px;font-weight:700;letter-spacing:0.04em;vertical-align:middle">&#x20bf; BTC</span>
           <span class="verdict-value">${d.verdict === 'BUY' ? t('components.macroSignals.verdict.buy') : d.verdict === 'CASH' ? t('components.macroSignals.verdict.cash') : escapeHtml(d.verdict)}</span>
           <span class="verdict-detail">${t('components.macroSignals.bullish', { count: String(d.bullishCount), total: String(d.totalCount) })}</span>
         </div>
@@ -212,7 +217,7 @@ export class MacroSignalsPanel extends Panel {
       </div>
     `;
 
-    this.setContent(html);
+    this.setSafeContent(unsafeRawHtml(html, 'legacy Panel.setContent() migration'));
   }
 
   private renderSignalCard(name: string, status: string, value: string, sparkline: string, detail: string, link: string | null): string {
@@ -241,7 +246,10 @@ export class MacroSignalsPanel extends Panel {
           <span class="signal-badge ${badgeClass}">${escapeHtml(fg.status)}</span>
         </div>
         <div class="signal-body signal-body-fg">
-          ${donutGaugeSvg(fg.value)}
+          <div style="display:flex;align-items:center;gap:8px">
+            ${donutGaugeSvg(fg.value)}
+            ${sparklineSvg(fg.history.map(h => h.value), 80, 28, fgSparklineColor(fg.status))}
+          </div>
         </div>
         <div class="signal-detail">
           <a href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener">alternative.me</a>

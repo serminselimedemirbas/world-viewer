@@ -1,17 +1,14 @@
 /**
- * Progress data service -- fetches World Bank indicator data for the
+ * Progress data service -- displays World Bank indicator data for the
  * "Human Progress" panel showing long-term positive trends.
  *
- * Uses the existing getIndicatorData() RPC from the economic service
- * (World Bank API via sebuf proxy). All 4 indicators use country code
- * "1W" (World aggregate).
- *
- * papaparse is installed for potential OWID CSV fallback but is NOT
- * used in the primary flow -- World Bank covers all 4 indicators.
+ * Data is pre-seeded by seed-wb-indicators.mjs on Railway and read
+ * from bootstrap/Redis. Never calls WB API from the frontend.
  */
 
-import { getIndicatorData } from '@/services/economic';
-import { createCircuitBreaker } from '@/utils';
+import { createCircuitBreaker } from '@/utils/circuit-breaker';
+import { getHydratedData } from '@/services/bootstrap';
+import { toApiUrl } from '@/services/runtime';
 
 // ---- Types ----
 
@@ -36,6 +33,21 @@ export interface ProgressDataSet {
   latestValue: number;
   oldestValue: number;
   changePercent: number; // Positive = improvement (accounts for invertTrend)
+}
+
+/**
+ * Where the rendered series came from. The UI surfaces a disclosure
+ * badge when `source === 'fallback'` so a degraded panel does not look
+ * like live truth (see issue #3758).
+ *   hydrated  -- bootstrap hydration cache (first page load)
+ *   bootstrap -- live fetch from /api/bootstrap
+ *   fallback  -- hardcoded FALLBACK_DATA (no fresh data available)
+ */
+export type ProgressDataSource = 'hydrated' | 'bootstrap' | 'fallback';
+
+export interface ProgressDataResult {
+  datasets: ProgressDataSet[];
+  source: ProgressDataSource;
 }
 
 // ---- Indicator Definitions ----
@@ -90,74 +102,100 @@ export const PROGRESS_INDICATORS: ProgressIndicator[] = [
 
 // ---- Circuit Breaker (persistent cache for instant reload) ----
 
-const breaker = createCircuitBreaker<ProgressDataSet[]>({
+const breaker = createCircuitBreaker<ProgressDataResult>({
   name: 'Progress Data',
   cacheTtlMs: 60 * 60 * 1000, // 1h — World Bank data changes yearly
   persistCache: true,
 });
 
-// ---- Data Fetching ----
+function fallbackResult(): ProgressDataResult {
+  return {
+    datasets: PROGRESS_INDICATORS.map(fallbackDataSet),
+    source: 'fallback',
+  };
+}
 
-async function fetchProgressDataFresh(): Promise<ProgressDataSet[]> {
-  const results = await Promise.all(
-    PROGRESS_INDICATORS.map(async (indicator): Promise<ProgressDataSet> => {
-      try {
-        const response = await getIndicatorData(indicator.code, {
-          countries: ['1W'],
-          years: indicator.years,
-        });
+// ---- Seed data shape (from seed-wb-indicators.mjs) ----
 
-        const countryData = response.byCountry['WLD'];
-        if (!countryData || countryData.values.length === 0) {
-          return fallbackDataSet(indicator);
-        }
+interface SeedProgressIndicator {
+  id: string;
+  code: string;
+  data: ProgressDataPoint[];
+  invertTrend: boolean;
+}
 
-        const data: ProgressDataPoint[] = countryData.values
-          .filter(v => v.value != null && Number.isFinite(v.value))
-          .map(v => ({
-            year: parseInt(v.year, 10),
-            value: v.value,
-          }))
-          .filter(d => !isNaN(d.year))
-          .sort((a, b) => a.year - b.year);
+// ---- Data Fetching (from Railway seed via bootstrap) ----
 
-        if (data.length === 0) {
-          return fallbackDataSet(indicator);
-        }
+function buildDataSet(indicator: ProgressIndicator, data: ProgressDataPoint[]): ProgressDataSet {
+  if (data.length === 0) return fallbackDataSet(indicator);
+  const oldestValue = data[0]!.value;
+  const latestValue = data[data.length - 1]!.value;
+  const rawChangePercent = oldestValue !== 0
+    ? ((latestValue - oldestValue) / Math.abs(oldestValue)) * 100
+    : 0;
+  const changePercent = indicator.invertTrend ? -rawChangePercent : rawChangePercent;
+  return {
+    indicator,
+    data,
+    latestValue,
+    oldestValue,
+    changePercent: Math.round(changePercent * 10) / 10,
+  };
+}
 
-        const oldestValue = data[0]!.value;
-        const latestValue = data[data.length - 1]!.value;
+function buildSeedMap(seeds: SeedProgressIndicator[]): Map<string, SeedProgressIndicator> {
+  const map = new Map<string, SeedProgressIndicator>();
+  for (const s of seeds) {
+    map.set(s.id, s);
+    map.set(s.code, s);
+  }
+  return map;
+}
 
-        const rawChangePercent = oldestValue !== 0
-          ? ((latestValue - oldestValue) / Math.abs(oldestValue)) * 100
-          : 0;
-        const changePercent = indicator.invertTrend
-          ? -rawChangePercent
-          : rawChangePercent;
+function resolveFromSeeds(seedMap: Map<string, SeedProgressIndicator>): ProgressDataSet[] {
+  return PROGRESS_INDICATORS.map(indicator => {
+    const seed = seedMap.get(indicator.id) || seedMap.get(indicator.code);
+    return seed?.data?.length ? buildDataSet(indicator, seed.data) : fallbackDataSet(indicator);
+  });
+}
 
-        return {
-          indicator,
-          data,
-          latestValue,
-          oldestValue,
-          changePercent: Math.round(changePercent * 10) / 10,
-        };
-      } catch {
-        return fallbackDataSet(indicator);
+export async function fetchProgressDataFresh(): Promise<ProgressDataResult> {
+  // 1. Try bootstrap hydration cache (first page load)
+  const hydrated = getHydratedData('progressData') as SeedProgressIndicator[] | undefined;
+  if (hydrated?.length) {
+    return { datasets: resolveFromSeeds(buildSeedMap(hydrated)), source: 'hydrated' };
+  }
+
+  // 2. Fallback: fetch from bootstrap endpoint directly
+  try {
+    const resp = await fetch(toApiUrl('/api/bootstrap?keys=progressData'), {
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (resp.ok) {
+      const { data } = (await resp.json()) as { data: { progressData?: SeedProgressIndicator[] } };
+      if (data.progressData?.length) {
+        return { datasets: resolveFromSeeds(buildSeedMap(data.progressData)), source: 'bootstrap' };
       }
-    }),
-  );
-  return results;
+    }
+  } catch { /* fall through to fallback */ }
+
+  // 3. Static fallback — UI must show a disclosure badge (#3758)
+  return fallbackResult();
 }
 
 /**
  * Fetch progress data with persistent caching.
  * Returns instantly from IndexedDB cache on subsequent loads.
  */
-export async function fetchProgressData(): Promise<ProgressDataSet[]> {
+export async function fetchProgressData(): Promise<ProgressDataResult> {
   return breaker.execute(
     () => fetchProgressDataFresh(),
-    PROGRESS_INDICATORS.map(fallbackDataSet),
+    fallbackResult(),
+    // Never persist the static fallback — fetchProgressDataFresh swallows
+    // errors and returns a fallback result, which the breaker would otherwise
+    // cache to IndexedDB for the 1h TTL and keep showing the disclosure
+    // banner long after the network recovers.
+    { shouldCache: (result) => result.source !== 'fallback' },
   );
 }
 

@@ -1,6 +1,7 @@
 import './styles/main.css';
 import './styles/settings-window.css';
 import { SettingsManager } from '@/services/settings-manager';
+import { exportSettings, importSettings, type ImportResult } from '@/utils/settings-persistence';
 import {
   SETTINGS_CATEGORIES,
   HUMAN_LABELS,
@@ -25,12 +26,16 @@ import {
   type RuntimeFeatureId,
   type RuntimeSecretKey,
 } from '@/services/runtime-config';
-import { getApiBaseUrl, getRemoteApiBaseUrl, isDesktopRuntime, resolveLocalApiPort } from '@/services/runtime';
-import { tryInvokeTauri, invokeTauri } from '@/services/tauri-bridge';
+import { resolveLocalApiPort, startSmartPollLoop, type SmartPollLoopHandle } from '@/services/runtime';
+import { proxyLocalApiRequest, tryInvokeTauri } from '@/services/tauri-bridge';
+import { openExternalUrl } from '@/services/external-navigation';
 import { escapeHtml } from '@/utils/sanitize';
 import { initI18n, t } from '@/services/i18n';
 import { applyStoredTheme } from '@/utils/theme-manager';
+import { applyFont } from '@/services/font-settings';
 import { trackFeatureToggle } from '@/services/analytics';
+import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
+
 
 let activeSection = 'overview';
 let settingsManager: SettingsManager;
@@ -57,21 +62,8 @@ function closeSettingsWindow(): void {
   void tryInvokeTauri<void>('close_settings_window').then(() => { }, () => window.close());
 }
 
-function getSidecarBase(): string {
-  return getApiBaseUrl() || '';
-}
-
-let _diagToken: string | null = null;
-
 async function diagFetch(path: string, init?: RequestInit): Promise<Response> {
-  if (!_diagToken) {
-    try {
-      _diagToken = await tryInvokeTauri<string>('get_local_api_token');
-    } catch { /* token unavailable */ }
-  }
-  const headers = new Headers(init?.headers);
-  if (_diagToken) headers.set('Authorization', `Bearer ${_diagToken}`);
-  return fetch(`${getSidecarBase()}${path}`, { ...init, headers });
+  return proxyLocalApiRequest(path, `http://localhost${path}`, init);
 }
 
 // ── Sidebar icons ──
@@ -113,7 +105,7 @@ function renderSidebar(): void {
   const progress = getTotalProgress();
   const overviewDotClass = progress.ready === progress.total ? 'dot-ok' : progress.ready > 0 ? 'dot-partial' : 'dot-warn';
   items.push(`
-    <button class="settings-nav-item${activeSection === 'overview' ? ' active' : ''}" data-section="overview" role="tab" aria-selected="${activeSection === 'overview'}">
+    <button class="settings-nav-item${activeSection === 'overview' ? ' active' : ''}" id="settingsTab-overview" data-section="overview" role="tab" aria-selected="${activeSection === 'overview'}" aria-controls="contentArea">
       ${SIDEBAR_ICONS.overview}
       <span class="settings-nav-label">Overview</span>
       <span class="settings-nav-dot ${overviewDotClass}"></span>
@@ -126,7 +118,7 @@ function renderSidebar(): void {
     const { ready, total } = getFeatureStatusCounts(cat);
     const dotClass = ready === total ? 'dot-ok' : ready > 0 ? 'dot-partial' : 'dot-warn';
     items.push(`
-      <button class="settings-nav-item${activeSection === cat.id ? ' active' : ''}" data-section="${cat.id}" role="tab" aria-selected="${activeSection === cat.id}">
+      <button class="settings-nav-item${activeSection === cat.id ? ' active' : ''}" id="settingsTab-${cat.id}" data-section="${cat.id}" role="tab" aria-selected="${activeSection === cat.id}" aria-controls="contentArea">
         ${SIDEBAR_ICONS[cat.id] || ''}
         <span class="settings-nav-label">${escapeHtml(cat.label)}</span>
         <span class="settings-nav-count">${ready}/${total}</span>
@@ -138,13 +130,29 @@ function renderSidebar(): void {
   items.push('<div class="settings-nav-sep"></div>');
 
   items.push(`
-    <button class="settings-nav-item${activeSection === 'debug' ? ' active' : ''}" data-section="debug" role="tab" aria-selected="${activeSection === 'debug'}">
+    <button class="settings-nav-item${activeSection === 'debug' ? ' active' : ''}" id="settingsTab-debug" data-section="debug" role="tab" aria-selected="${activeSection === 'debug'}" aria-controls="contentArea">
       ${SIDEBAR_ICONS.debug}
       <span class="settings-nav-label">Debug &amp; Logs</span>
     </button>
   `);
 
-  nav.innerHTML = items.join('');
+  setTrustedHtml(nav, trustedHtml(items.join(''), "legacy direct innerHTML migration"));
+  // Pair the tabpanel with the selected tab so AT announces which section
+  // the content belongs to (the tablist/tabpanel pairing was otherwise
+  // broken on both ends - tabs had no ids, the panel no aria-labelledby).
+  labelSettingsContentArea('section');
+}
+
+function labelSettingsContentArea(mode: 'section' | 'search'): void {
+  const contentArea = document.getElementById('contentArea');
+  if (!contentArea) return;
+  if (mode === 'search') {
+    contentArea.removeAttribute('aria-labelledby');
+    contentArea.setAttribute('aria-label', 'Search results');
+    return;
+  }
+  contentArea.removeAttribute('aria-label');
+  contentArea.setAttribute('aria-labelledby', `settingsTab-${activeSection}`);
 }
 
 // ── Section rendering ──
@@ -189,8 +197,6 @@ function renderOverview(area: HTMLElement): void {
   const wmState = getSecretState('WORLDMONITOR_API_KEY');
   const wmStatusText = wmState.present ? 'Active' : 'Not set';
   const wmStatusClass = wmState.present ? 'ok' : 'warn';
-  const alreadyRegistered = false; // Force-show form for email testing
-
   const catCards = SETTINGS_CATEGORIES.map(cat => {
     const { ready: catReady, total: catTotal } = getFeatureStatusCounts(cat);
     const cls = catReady === catTotal ? 'ov-cat-ok' : catReady > 0 ? 'ov-cat-partial' : 'ov-cat-warn';
@@ -200,7 +206,7 @@ function renderOverview(area: HTMLElement): void {
     </button>`;
   }).join('');
 
-  area.innerHTML = `
+  setTrustedHtml(area, trustedHtml(`
     <div class="settings-overview">
       <div class="settings-ov-progress">
         <svg class="settings-ov-ring" viewBox="0 0 100 100" width="120" height="120">
@@ -238,21 +244,14 @@ function renderOverview(area: HTMLElement): void {
       <section class="wm-section">
         <h2 class="wm-section-title">${t('modals.settingsWindow.worldMonitor.register.title')}</h2>
         <p class="wm-section-desc">${t('modals.settingsWindow.worldMonitor.register.description')}</p>
-        ${alreadyRegistered ? `
-        <p class="wm-reg-status ok">${t('modals.settingsWindow.worldMonitor.register.alreadyRegistered')}</p>
-        ` : `
         <div class="wm-register-row">
-          <input type="email" class="wm-input wm-email" data-wm-email
-            placeholder="${t('modals.settingsWindow.worldMonitor.register.emailPlaceholder')}" />
-          <button type="button" class="wm-submit-btn" data-wm-register>
+          <button type="button" class="wm-submit-btn" data-wm-open-pro>
             ${t('modals.settingsWindow.worldMonitor.register.submitBtn')}
           </button>
         </div>
-        <p class="wm-reg-status" data-wm-reg-status></p>
-        `}
       </section>
     </div>
-  `;
+  `, "legacy direct innerHTML migration"));
 
   initOverviewListeners(area);
 }
@@ -270,47 +269,9 @@ function initOverviewListeners(area: HTMLElement): void {
     }
   });
 
-  area.querySelector('[data-wm-register]')?.addEventListener('click', async () => {
-    const emailInput = area.querySelector<HTMLInputElement>('[data-wm-email]');
-    const regStatus = area.querySelector<HTMLElement>('[data-wm-reg-status]');
-    const btn = area.querySelector<HTMLButtonElement>('[data-wm-register]');
-    if (!emailInput || !regStatus || !btn) return;
-
-    const email = emailInput.value.trim();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      regStatus.textContent = t('modals.settingsWindow.worldMonitor.register.invalidEmail');
-      regStatus.className = 'wm-reg-status error';
-      return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = t('modals.settingsWindow.worldMonitor.register.submitting');
-
-    try {
-      const base = isDesktopRuntime() ? getRemoteApiBaseUrl() : '';
-      const res = await fetch(`${base}/api/register-interest`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, source: 'desktop-settings' }),
-      });
-      const data = await res.json() as { status?: string; error?: string };
-      if (data.status === 'already_registered' || data.status === 'registered') {
-        localStorage.setItem('wm-waitlist-registered', '1');
-        regStatus.textContent = data.status === 'already_registered'
-          ? t('modals.settingsWindow.worldMonitor.register.alreadyRegistered')
-          : t('modals.settingsWindow.worldMonitor.register.success');
-        regStatus.className = 'wm-reg-status ok';
-      } else {
-        regStatus.textContent = data.error || t('modals.settingsWindow.worldMonitor.register.error');
-        regStatus.className = 'wm-reg-status error';
-      }
-    } catch {
-      regStatus.textContent = t('modals.settingsWindow.worldMonitor.register.error');
-      regStatus.className = 'wm-reg-status error';
-    } finally {
-      btn.disabled = false;
-      btn.textContent = t('modals.settingsWindow.worldMonitor.register.submitBtn');
-    }
+  area.querySelector('[data-wm-open-pro]')?.addEventListener('click', () => {
+    const url = 'https://worldmonitor.app/pro';
+    void openExternalUrl(url);
   });
 
   area.querySelectorAll<HTMLButtonElement>('.settings-ov-cat[data-section]').forEach(btn => {
@@ -365,12 +326,12 @@ function renderFeatureSection(area: HTMLElement, cat: SettingsCategory): void {
     `;
   }).join('');
 
-  area.innerHTML = `
+  setTrustedHtml(area, trustedHtml(`
     <div class="settings-section-header">
       <h2>${escapeHtml(cat.label)}</h2>
     </div>
     <div class="settings-feat-list">${featureCards}</div>
-  `;
+  `, "legacy direct innerHTML migration"));
 
   initFeatureSectionListeners(area);
 }
@@ -401,11 +362,11 @@ function renderSecretInput(key: RuntimeSecretKey, _featureId: RuntimeFeatureId):
       <div class="settings-secret-row">
         <div class="settings-secret-label">${escapeHtml(label)}</div>
         <span class="settings-secret-status ${statusClass}">${escapeHtml(statusText)}</span>
-        <select data-model-select data-feature="${_featureId}" class="${inputClass}">
+        <select data-model-select data-feature="${_featureId}" class="${inputClass}" aria-label="${escapeHtml(label)}">
           ${storedModel ? `<option value="${escapeHtml(storedModel)}" selected>${escapeHtml(storedModel)}</option>` : '<option value="" selected disabled>Loading models...</option>'}
         </select>
         <input type="text" data-model-manual data-feature="${_featureId}" class="${inputClass} hidden-input"
-          placeholder="Or type model name" autocomplete="off"
+          placeholder="Or type model name" aria-label="${escapeHtml(label)}" autocomplete="off"
           ${storedModel ? `value="${escapeHtml(storedModel)}"` : ''}>
         ${hintText ? `<span class="settings-secret-hint">${escapeHtml(hintText)}</span>` : ''}
       </div>
@@ -422,7 +383,7 @@ function renderSecretInput(key: RuntimeSecretKey, _featureId: RuntimeFeatureId):
       <span class="settings-secret-status ${statusClass}">${escapeHtml(statusText)}</span>
       <div class="settings-input-wrapper${showGetKey ? ' has-suffix' : ''}">
         <input type="${isPlaintext ? 'text' : 'password'}" data-secret="${key}" data-feature="${_featureId}"
-          placeholder="${pending ? 'Staged' : 'Enter value...'}" autocomplete="off" class="${inputClass}"
+          placeholder="${pending ? 'Staged' : 'Enter value...'}" aria-label="${escapeHtml(label)}" autocomplete="off" class="${inputClass}"
           ${pending ? `value="${isPlaintext ? escapeHtml(settingsManager.getPending(key) || '') : MASKED_SENTINEL}"` : (isPlaintext && state.present ? `value="${escapeHtml(getRuntimeConfigSnapshot().secrets[key]?.value || '')}"` : '')}>
         ${getKeyHtml}
       </div>
@@ -527,11 +488,9 @@ function initFeatureSectionListeners(area: HTMLElement): void {
       e.preventDefault();
       const url = link.dataset.signupUrl;
       if (!url) return;
-      if (isDesktopRuntime()) {
-        void invokeTauri<void>('open_url', { url }).catch(() => window.open(url, '_blank'));
-      } else {
-        window.open(url, '_blank');
-      }
+      // Staged-but-unsaved secrets live in this panel; a same-tab navigation
+      // would discard them silently (#6137).
+      void openExternalUrl(url, null, { sameTabFallback: false });
     });
   });
 
@@ -580,7 +539,7 @@ async function loadOllamaModelsIntoSelect(select: HTMLSelectElement): Promise<vo
     || snapshot.secrets['OLLAMA_API_URL']?.value
     || '';
   if (!ollamaUrl) {
-    select.innerHTML = '<option value="" disabled selected>Set Ollama URL first</option>';
+    setTrustedHtml(select, trustedHtml('<option value="" disabled selected>Set Ollama URL first</option>', "legacy direct innerHTML migration"));
     return;
   }
 
@@ -614,15 +573,15 @@ async function loadOllamaModelsIntoSelect(select: HTMLSelectElement): Promise<vo
   }
 
   const options = currentModel ? '' : '<option value="" selected disabled>Select a model...</option>';
-  select.innerHTML = options + models.map(name =>
+  setTrustedHtml(select, trustedHtml(options + models.map(name =>
     `<option value="${escapeHtml(name)}" ${name === currentModel ? 'selected' : ''}>${escapeHtml(name)}</option>`
-  ).join('');
+  ).join(''), "legacy direct innerHTML migration"));
 }
 
 // ── Debug section ──
 
 function renderDebug(area: HTMLElement): void {
-  area.innerHTML = `
+  setTrustedHtml(area, trustedHtml(`
     <div class="settings-section-header">
       <h2>Debug &amp; Logs</h2>
     </div>
@@ -630,6 +589,18 @@ function renderDebug(area: HTMLElement): void {
       <button id="openLogsBtn" type="button">Open Logs Folder</button>
       <button id="openSidecarLogBtn" type="button">Open API Log</button>
     </div>
+    <section class="debug-data-section">
+      <h3>Data Management</h3>
+      <div class="debug-data-actions">
+        <button type="button" class="settings-btn settings-btn-secondary" id="exportSettingsBtn">
+          ${t('components.settings.exportSettings')}
+        </button>
+        <button type="button" class="settings-btn settings-btn-secondary" id="importSettingsBtn">
+          ${t('components.settings.importSettings')}
+        </button>
+        <input type="file" id="importSettingsInput" accept=".json" style="display: none;" />
+      </div>
+    </section>
     <section class="settings-diagnostics" id="diagnosticsSection">
       <header class="diag-header">
         <h2>Diagnostics</h2>
@@ -648,7 +619,7 @@ function renderDebug(area: HTMLElement): void {
       </div>
       <div id="trafficLog" class="diag-traffic-log"></div>
     </section>
-  `;
+  `, "legacy direct innerHTML migration"));
 
   area.querySelector('#openLogsBtn')?.addEventListener('click', () => {
     void invokeDesktopAction('open_logs_folder', t('modals.settingsWindow.openLogs'));
@@ -656,6 +627,39 @@ function renderDebug(area: HTMLElement): void {
 
   area.querySelector('#openSidecarLogBtn')?.addEventListener('click', () => {
     void invokeDesktopAction('open_sidecar_log_file', t('modals.settingsWindow.openApiLog'));
+  });
+
+  area.querySelector('#exportSettingsBtn')?.addEventListener('click', () => {
+    exportSettings();
+  });
+
+  const importInput = area.querySelector<HTMLInputElement>('#importSettingsInput');
+  area.querySelector('#importSettingsBtn')?.addEventListener('click', () => {
+    importInput?.click();
+  });
+
+  importInput?.addEventListener('change', async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    try {
+      const result: ImportResult = await importSettings(file);
+      setActionStatus(t('components.settings.importSuccess', { count: String(result.keysImported) }), 'ok');
+    } catch (err: unknown) {
+      if (err instanceof DOMException) {
+        if (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+          setActionStatus(t('components.settings.importFailed') + ': storage limit reached', 'error');
+        } else if (err.name === 'SecurityError') {
+          setActionStatus(t('components.settings.importFailed') + ': storage blocked', 'error');
+        } else {
+          setActionStatus(`${t('components.settings.importFailed')}: ${err.message || err.name}`, 'error');
+        }
+      } else if (err instanceof Error && err.message) {
+        setActionStatus(`${t('components.settings.importFailed')}: ${err.message}`, 'error');
+      } else {
+        setActionStatus(t('components.settings.importFailed'), 'error');
+      }
+    }
+    importInput.value = '';
   });
 
   initDiagnostics();
@@ -708,7 +712,7 @@ function initDiagnostics(): void {
       if (trafficCount) trafficCount.textContent = `(${entries.length})`;
 
       if (entries.length === 0) {
-        trafficLogEl.innerHTML = `<p class="diag-empty">${t('modals.settingsWindow.noTraffic')}</p>`;
+        setTrustedHtml(trafficLogEl, trustedHtml(`<p class="diag-empty">${t('modals.settingsWindow.noTraffic')}</p>`, "legacy direct innerHTML migration"));
         return;
       }
 
@@ -718,9 +722,9 @@ function initDiagnostics(): void {
         return `<tr class="diag-${cls}"><td>${escapeHtml(ts)}</td><td>${e.method}</td><td title="${escapeHtml(e.path)}">${escapeHtml(e.path)}</td><td>${e.status}</td><td>${e.durationMs}ms</td></tr>`;
       }).join('');
 
-      trafficLogEl.innerHTML = `<table class="diag-table"><thead><tr><th>${t('modals.settingsWindow.table.time')}</th><th>${t('modals.settingsWindow.table.method')}</th><th>${t('modals.settingsWindow.table.path')}</th><th>${t('modals.settingsWindow.table.status')}</th><th>${t('modals.settingsWindow.table.duration')}</th></tr></thead><tbody>${rows}</tbody></table>`;
+      setTrustedHtml(trafficLogEl, trustedHtml(`<table class="diag-table"><thead><tr><th scope="col">${t('modals.settingsWindow.table.time')}</th><th scope="col">${t('modals.settingsWindow.table.method')}</th><th scope="col">${t('modals.settingsWindow.table.path')}</th><th scope="col">${t('modals.settingsWindow.table.status')}</th><th scope="col">${t('modals.settingsWindow.table.duration')}</th></tr></thead><tbody>${rows}</tbody></table>`, "legacy direct innerHTML migration"));
     } catch {
-      trafficLogEl.innerHTML = `<p class="diag-empty">${t('modals.settingsWindow.sidecarUnreachable')}</p>`;
+      setTrustedHtml(trafficLogEl, trustedHtml(`<p class="diag-empty">${t('modals.settingsWindow.sidecarUnreachable')}</p>`, "legacy direct innerHTML migration"));
     }
   }
 
@@ -728,26 +732,31 @@ function initDiagnostics(): void {
 
   clearBtn?.addEventListener('click', async () => {
     try { await diagFetch('/api/local-traffic-log', { method: 'DELETE' }); } catch { /* ignore */ }
-    if (trafficLogEl) trafficLogEl.innerHTML = `<p class="diag-empty">${t('modals.settingsWindow.logCleared')}</p>`;
+    if (trafficLogEl) setTrustedHtml(trafficLogEl, trustedHtml(`<p class="diag-empty">${t('modals.settingsWindow.logCleared')}</p>`, "legacy direct innerHTML migration"));
     if (trafficCount) trafficCount.textContent = '(0)';
   });
 
-  let refreshInterval: ReturnType<typeof setInterval> | null = null;
+  let refreshPollLoop: SmartPollLoopHandle | null = null;
 
   function startAutoRefresh(): void {
     stopAutoRefresh();
-    refreshInterval = setInterval(() => void refreshTrafficLog(), 3000);
+    refreshPollLoop = startSmartPollLoop(() => refreshTrafficLog(), {
+      intervalMs: 3000,
+      pauseWhenHidden: true,
+      refreshOnVisible: true,
+      runImmediately: true,
+      jitterFraction: 0,
+    });
   }
 
   function stopAutoRefresh(): void {
-    if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
+    if (refreshPollLoop) { refreshPollLoop.stop(); refreshPollLoop = null; }
   }
 
   autoRefreshToggle?.addEventListener('change', () => {
     if (autoRefreshToggle.checked) startAutoRefresh(); else stopAutoRefresh();
   });
 
-  void refreshTrafficLog();
   startAutoRefresh();
 
   _diagCleanup = stopAutoRefresh;
@@ -791,7 +800,8 @@ function handleSearch(query: string): void {
   }
 
   if (matches.length === 0) {
-    area.innerHTML = `<div class="settings-search-empty"><p>No features match "${escapeHtml(query)}"</p></div>`;
+    setTrustedHtml(area, trustedHtml(`<div class="settings-search-empty"><p>No features match "${escapeHtml(query)}"</p></div>`, "legacy direct innerHTML migration"));
+    labelSettingsContentArea('search');
     return;
   }
 
@@ -831,13 +841,14 @@ function handleSearch(query: string): void {
     `;
   }).join('');
 
-  area.innerHTML = `
+  setTrustedHtml(area, trustedHtml(`
     <div class="settings-section-header">
       <h2>Search results for "${escapeHtml(query)}"</h2>
     </div>
     <div class="settings-feat-list">${cards}</div>
-  `;
+  `, "legacy direct innerHTML migration"));
 
+  labelSettingsContentArea('search');
   initFeatureSectionListeners(area);
 }
 
@@ -846,6 +857,23 @@ function handleSearch(query: string): void {
 async function initSettingsWindow(): Promise<void> {
   await initI18n();
   applyStoredTheme();
+  applyFont();
+
+  // Localize the static HTML shell (settings.html) — labels are baked in
+  // English so the page paints something before this script runs; once
+  // i18n is ready we swap them to the user's locale.
+  document.title = t('modals.settingsWindow.shellTitle');
+  const headerTitle = document.querySelector('.settings-header-title');
+  if (headerTitle) headerTitle.textContent = t('modals.settingsWindow.shellTitle');
+  const searchInputEl = document.getElementById('settingsSearch') as HTMLInputElement | null;
+  if (searchInputEl) {
+    searchInputEl.placeholder = t('modals.settingsWindow.shellSearchPlaceholder');
+    searchInputEl.setAttribute('aria-label', t('modals.settingsWindow.shellSearchPlaceholder'));
+  }
+  const cancelEl = document.getElementById('cancelBtn');
+  if (cancelEl) cancelEl.textContent = t('modals.settingsWindow.shellCancel');
+  const okEl = document.getElementById('okBtn');
+  if (okEl) okEl.textContent = t('modals.settingsWindow.shellSaveClose');
 
   try { await resolveLocalApiPort(); } catch { /* use default */ }
 

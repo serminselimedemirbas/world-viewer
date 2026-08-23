@@ -29,7 +29,7 @@ World Monitor is a real-time OSINT dashboard built with **Vanilla TypeScript** (
 | **TypeScript** | All code — frontend, edge functions, and handlers |
 | **Vite** | Build tool and dev server |
 | **Sebuf** | Proto-first HTTP RPC framework for typed API contracts |
-| **Protobuf / Buf** | Service and message definitions across 17 domains |
+| **Protobuf / Buf** | Service and message definitions across domains |
 | **MapLibre GL** | Base map rendering (tiles, globe mode, camera) |
 | **deck.gl** | WebGL overlay layers (scatterplot, geojson, arcs, heatmaps) |
 | **d3** | Charts, sparklines, and data visualization |
@@ -40,13 +40,16 @@ World Monitor is a real-time OSINT dashboard built with **Vanilla TypeScript** (
 
 ### Variant System
 
-The codebase produces three app variants from the same source, each targeting a different audience:
+The codebase produces app variants from the same source, each targeting a different audience or use case:
 
 | Variant | Command | Focus |
 |---|---|---|
 | `full` | `npm run dev` | Geopolitics, military, conflicts, infrastructure |
 | `tech` | `npm run dev:tech` | Startups, AI/ML, cloud, cybersecurity |
 | `finance` | `npm run dev:finance` | Markets, trading, central banks, commodities |
+| `commodity` | `npm run dev:commodity` | Commodities, mining, energy markets |
+| `happy` | `npm run dev:happy` | Positive news and constructive signals |
+| `energy` | `npm run dev:energy` | Energy security, chokepoints, oil/gas |
 
 Variants share all code but differ in default panels, map layers, and RSS feeds. Variant configs live in `src/config/variants/`.
 
@@ -54,14 +57,14 @@ Variants share all code but differ in default panels, map layers, and RSS feeds.
 
 | Directory | Purpose |
 |---|---|
-| `src/components/` | UI components — Panel subclasses, map, modals (~50 panels) |
+| `src/components/` | UI components |
 | `src/services/` | Data fetching modules — sebuf client wrappers, AI, signal analysis |
 | `src/config/` | Static data and variant configs (feeds, geo, military, pipelines, ports) |
 | `src/generated/` | Auto-generated sebuf client + server stubs (**do not edit by hand**) |
 | `src/types/` | TypeScript type definitions |
-| `src/locales/` | i18n JSON files (14 languages) |
+| `src/locales/` | i18n JSON files |
 | `src/workers/` | Web Workers for analysis |
-| `server/` | Sebuf handler implementations for all 17 domain services |
+| `server/` | Sebuf handler implementations |
 | `api/` | Vercel Edge Functions (sebuf gateway + legacy endpoints) |
 | `proto/` | Protobuf service and message definitions |
 | `data/` | Static JSON datasets |
@@ -86,6 +89,9 @@ Variants share all code but differ in default panels, map layers, and RSS feeds.
 ## Development Setup
 
 ```bash
+# Check that your machine has what the build needs (see Build Prerequisites below)
+npm run check:prereqs
+
 # Install everything (buf CLI, sebuf plugins, npm deps, Playwright browsers)
 make install
 
@@ -95,27 +101,76 @@ npm run dev
 # Start other variants
 npm run dev:tech
 npm run dev:finance
+npm run dev:commodity
+npm run dev:happy
+npm run dev:energy
 
 # Run type checking
 npm run typecheck
 
 # Run tests
 npm run test:data          # Data integrity tests
-npm run test:e2e           # Playwright end-to-end tests
+npm run test:e2e:full      # Playwright end-to-end tests (full variant)
 
 # Production build (per variant)
 npm run build              # full
 npm run build:tech
 npm run build:finance
+npm run build:commodity
+npm run build:happy
+npm run build:energy
 ```
 
-The dev server runs at `http://localhost:3000`. Run `make help` to see all available make targets.
+The dev server runs at `http://localhost:3000` (override the port with `DEV_PORT` in `.env.local`). Run `make help` to see all available make targets.
+
+### Build Prerequisites
+
+`npm run check:prereqs` reports everything missing in one pass and, when the
+local package archive confirms the names, prints a single install command for
+your distribution. It runs automatically before `npm run desktop:dev` and
+`npm run desktop:tauri:build`.
+
+```bash
+npm run check:prereqs              # everything
+npm run check:prereqs -- --scope web       # web app only
+npm run check:prereqs:desktop              # desktop development
+npm run check:prereqs:desktop:bundle       # desktop bundle, including AppImage tools
+npm run check:prereqs -- --json            # machine-readable, for CI
+npm run check:prereqs -- --warn-only       # report but do not fail
+```
+
+**Web app:** Node >= 22 (the floor CI builds on). Nothing else.
+
+**Desktop app (Tauri v2):** Rust via [rustup](https://rustup.rs), plus native
+libraries on Linux. macOS and Windows need only the Rust toolchain. On Linux
+the check covers WebKitGTK 4.1, JavaScriptCoreGTK 4.1, GTK 3, libsoup 3,
+GLib/GObject, Cairo, Pango, ATK and D-Bus — and, for AppImage bundling,
+librsvg2 (dev), patchelf and the FUSE 2 runtime.
+
+Two of these have bitten people and are worth knowing:
+
+- **librsvg2-dev, not just the runtime.** `linuxdeploy-plugin-gtk` locates the
+  SVG pixbuf loader via `pkg-config --variable=libdir librsvg-2.0`, so it needs
+  the `.pc` file from the `-dev` package. Without it, `tauri build` fails at the
+  very end with only `failed to run linuxdeploy` and no cause.
+- **Tauri v2 requires the 4.1 / libsoup3 line.** WebKitGTK 4.0 is the Tauri v1
+  pairing and will not satisfy this build.
+
+The check probes capabilities (pkg-config modules, sonames, commands) rather
+than package names, and resolves names against your archive, so distro renames
+such as Ubuntu's `libfuse2` → `libfuse2t64` t64 transition are handled
+automatically. Debian/Ubuntu, Fedora/RHEL, Arch and openSUSE families get an
+install command; other distributions get the capability list to map themselves.
+
+openSUSE package names are currently unverified — derived from naming
+convention rather than checked against a live archive — and the check says so
+when it prints them. Corrections welcome.
 
 ### Environment Variables (Optional)
 
 For full functionality, copy `.env.example` to `.env.local` and fill in the API keys you need. The app runs without any API keys — external data sources will simply be unavailable.
 
-See [API Dependencies](docs/DOCUMENTATION.md#api-dependencies) for the full list.
+See the [API dependencies docs](https://www.worldmonitor.app/docs/getting-started#api-dependencies) for the full list.
 
 ## How to Contribute
 
@@ -123,7 +178,7 @@ See [API Dependencies](docs/DOCUMENTATION.md#api-dependencies) for the full list
 
 - **Bug fixes** — found something broken? Fix it!
 - **New data layers** — add new geospatial data sources to the map
-- **RSS feeds** — expand our 100+ feed collection with quality sources
+- **RSS feeds** — expand our curated feed collection with quality sources
 - **UI/UX improvements** — make the dashboard more intuitive
 - **Performance optimizations** — faster loading, better caching
 - **Documentation** — improve docs, add examples, fix typos
@@ -147,6 +202,11 @@ See [API Dependencies](docs/DOCUMENTATION.md#api-dependencies) for the full list
 4. **Keep PRs focused** — one feature or fix per pull request
 5. **Write a clear description** explaining what your PR does and why
 6. **Link related issues** if applicable
+7. **Base recovery and follow-up PRs on `main`**, never on an in-flight branch. A stacked PR whose parent merges (and auto-deletes its branch) can still show `MERGED` while its commits never reach `main` (#7006).
+
+### Stacked PRs
+
+Target another feature branch only while that parent is still open. Once the parent merges, retarget the child to `main` before merging — or open the follow-up against `main` from the start. CI fails a child whose base branch's own PR is already merged, because that merge would land on a tombstone.
 
 ### PR Title Convention
 
@@ -234,6 +294,19 @@ make install-buf       # Install buf CLI (requires Go)
 make install-plugins   # Install sebuf protoc-gen plugins (requires Go)
 ```
 
+The pinned sebuf version is set by `SEBUF_VERSION` in the `Makefile` (currently **v0.11.1**). All three plugins — `protoc-gen-ts-client`, `protoc-gen-ts-server`, `protoc-gen-openapiv3` — must be installed from the same sebuf release. If you see codegen drift after pulling, rerun `make install-plugins` to resync.
+
+### OpenAPI Output
+
+`make generate` (i.e. `cd proto && buf generate`) produces:
+
+| File | Purpose |
+| --- | --- |
+| `docs/api/{Service}.openapi.yaml` / `.json` | Per-service specs — referenced individually by Mintlify in `docs/docs.json` |
+| `docs/api/worldmonitor.openapi.yaml` | **Unified bundle** spanning every service (sebuf ≥ v0.11.0) — use this for external consumers, API explorers, or anywhere you want a single spec covering all RPCs |
+
+The unified bundle is emitted by a third `protoc-gen-openapiv3` invocation in `proto/buf.gen.yaml` using `bundle=true`, `bundle_only=true`, and `strategy: all`. Regenerate alongside the per-service files; do not edit by hand.
+
 ## Adding Data Sources
 
 To add a new data layer to the map:
@@ -246,7 +319,7 @@ To add a new data layer to the map:
 6. **Create the service module** in `src/services/{domain}/` wrapping the generated client
 7. **Add the layer config** and implement the map renderer following existing layer patterns
 8. **Add to layer toggles** — make it toggleable in the UI
-9. **Document the source** — add it to `docs/DOCUMENTATION.md`
+9. **Document the source** — add it to the [data sources docs](https://www.worldmonitor.app/docs/data-sources)
 
 For endpoints that deal with non-JSON payloads (XML feeds, binary data, HTML embeds), you can add a standalone Edge Function in `api/` instead of Sebuf. For anything returning JSON, prefer Sebuf — the typed contracts are always worth it.
 
@@ -256,6 +329,28 @@ For endpoints that deal with non-JSON payloads (XML feeds, binary data, HTML emb
 - Must have a permissive license or be public government data
 - Should update at least daily for real-time relevance
 - Must include geographic coordinates or be geo-locatable
+
+### Source attribution ledger
+
+Any new outbound host that appears in a URL literal under `scripts/`, `server/`, `api/`, or `src/` is discovered by `scripts/source-attribution.mjs` and needs a curated row in `shared/source-attribution-manifest.json`. This catches contributions that only add data — a feed URL, an MCP preset in `src/services/mcp-store.ts` — with no obvious link to the ledger:
+
+```bash
+npm run sources:check     # fails with "missing manifest entry for <host>"
+npm run sources:generate  # writes the row and regenerates docs/source-attribution.mdx
+```
+
+Give the host a display name only by adding it to `PROVIDER_OVERRIDES` in that script and bumping `PROVIDER_IDENTITY_REVIEW` to the recomputed digest; provider identities are hash-pinned so renaming one stays an explicit review event. Because the script lives inside the roots it scans, a URL you cite in one of its own strings counts as a discovered source — fine when that host is already registered (the licence links on existing rows), but citing an unregistered host invents a provider row for it.
+
+Two ordering rules follow from the manifest being a fixpoint of the source tree: a row cannot be added ahead of the code that introduces its host, and a rebase that lands alongside another attribution change should re-run `sources:generate` rather than hand-merge the generated files.
+
+### Country boundary overrides
+
+Country outlines are loaded from `public/data/countries.geojson`. Optional higher-resolution overrides (sourced from [Natural Earth](https://www.naturalearthdata.com/)) are served from R2 CDN. The app loads overrides after the main file and replaces geometry for any country whose `ISO3166-1-Alpha-2` (or `ISO_A2`) matches. To refresh boundary overrides from Natural Earth, run:
+
+```bash
+node scripts/fetch-country-boundary-overrides.mjs
+rclone copy public/data/country-boundary-overrides.geojson r2:worldmonitor-maps/
+```
 
 ## Adding RSS Feeds
 

@@ -1,12 +1,16 @@
 import { Panel } from './Panel';
+import { createLazyClient, getRpcBaseUrl } from '@/services/rpc-client';
+import { proFreshRpcFetch } from '@/services/premium-fetch';
 import { t } from '@/services/i18n';
-import { escapeHtml } from '@/utils/sanitize';
+import { escapeHtml, unsafeRawHtml } from '@/utils/sanitize';
 import { formatPrice, formatChange, getChangeClass } from '@/utils';
 import { miniSparkline } from '@/utils/sparkline';
-import { MarketServiceClient } from '@/generated/client/worldmonitor/market/v1/service_client';
-import type { ListGulfQuotesResponse, GulfQuote } from '@/generated/client/worldmonitor/market/v1/service_client';
 
-const client = new MarketServiceClient('', { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+import type { ListGulfQuotesResponse, GulfQuote } from '@/generated/client/worldmonitor/market/v1/service_client';
+import { getHydratedData } from '@/services/bootstrap';
+import { MarketServiceClient } from '@/services/generated-rpc-clients';
+
+const getMarketClient = createLazyClient(() => new MarketServiceClient(getRpcBaseUrl(), { fetch: proFreshRpcFetch }));
 
 function renderSection(title: string, quotes: GulfQuote[]): string {
   if (quotes.length === 0) return '';
@@ -27,36 +31,36 @@ function renderSection(title: string, quotes: GulfQuote[]): string {
 }
 
 export class GulfEconomiesPanel extends Panel {
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
-
   constructor() {
-    super({ id: 'gulf-economies', title: t('panels.gulfEconomies') });
-    setTimeout(() => void this.fetchData(), 8_000);
-  }
-
-  destroy(): void {
-    if (this.pollTimer) clearInterval(this.pollTimer);
-    super.destroy();
+    super({ id: 'gulf-economies', title: t('panels.gulfEconomies'), infoTooltip: t('components.gulfEconomies.infoTooltip') });
   }
 
   public async fetchData(): Promise<void> {
     try {
-      const data = await client.listGulfQuotes({});
+      const hydrated = getHydratedData('gulfQuotes') as ListGulfQuotesResponse | undefined;
+      if (hydrated?.quotes?.length) {
+        if (!this.element?.isConnected) return;
+        this.renderGulf(hydrated);
+        void getMarketClient().listGulfQuotes({}).then(data => {
+          if (!this.element?.isConnected || !data.quotes?.length) return;
+          this.renderGulf(data);
+        }).catch(() => {});
+        return;
+      }
+      const data = await getMarketClient().listGulfQuotes({});
+      if (!this.element?.isConnected) return;
       this.renderGulf(data);
     } catch (err) {
       if (this.isAbortError(err)) return;
-      this.showError(t('common.failedMarketData'));
-    }
-
-    if (!this.pollTimer) {
-      this.pollTimer = setInterval(() => void this.fetchData(), 60_000);
+      if (!this.element?.isConnected) return;
+      this.showError(t('common.failedMarketData'), () => void this.fetchData());
     }
   }
 
   private renderGulf(data: ListGulfQuotesResponse): void {
-    if (!data.quotes.length) {
+    if (!data.quotes?.length) {
       const msg = data.rateLimited ? t('common.rateLimitedMarket') : t('common.failedMarketData');
-      this.showError(msg);
+      this.showError(msg, () => void this.fetchData());
       return;
     }
 
@@ -69,6 +73,6 @@ export class GulfEconomiesPanel extends Panel {
       renderSection(t('panels.gulfCurrencies'), currencies) +
       renderSection(t('panels.gulfOil'), oil);
 
-    this.setContent(html);
+    this.setSafeContent(unsafeRawHtml(html, 'legacy Panel.setContent() migration'));
   }
 }
