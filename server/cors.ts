@@ -21,7 +21,7 @@ const PRODUCTION_PATTERNS: RegExp[] = [
   /^https?:\/\/tauri\.localhost(:\d+)?$/,
   /^https?:\/\/[a-z0-9-]+\.tauri\.localhost(:\d+)?$/i,
   /^tauri:\/\/localhost$/,
-  /^asset:\/\/localhost$/
+  /^asset:\/\/localhost$/,
 ];
 
 const DEV_PATTERNS: RegExp[] = [
